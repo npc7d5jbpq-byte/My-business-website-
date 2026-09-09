@@ -12,7 +12,7 @@
   const today = () => new Date().toISOString().slice(0, 10);
 
   document.getElementById('colony-tiles').innerHTML = skeletonCards(8);
-  document.getElementById('plots-body').innerHTML = skeletonRows(3, 9);
+  document.getElementById('plots-body').innerHTML = skeletonRows(3, 10);
   document.getElementById('milestones-body').innerHTML = skeletonRows(2, 5);
   document.getElementById('expenses-body').innerHTML = skeletonRows(2, 6);
 
@@ -60,22 +60,43 @@
 
   // ---- Plots ----
 
+  const STANDARD_SIZES = ['3 Marla', '4 Marla', '5 Marla', '7 Marla', '10 Marla'];
+  const OTHER_SIZE = 'Other (specify below)';
+
+  const CATEGORY_LABELS = { residential: 'Residential', commercial: 'Commercial', shop: 'Shop' };
+
+  // The earliest payment that's promised but not yet paid - the plot's
+  // "next payment schedule" entry, shown right in the plots table.
+  function nextDueOf(payments) {
+    const pending = (payments || []).filter((p) => !p.paidDate && p.dueDate);
+    if (!pending.length) return null;
+    pending.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+    const next = pending[0];
+    return Object.assign({}, next, { overdue: new Date(next.dueDate) < new Date(today()) });
+  }
+
   function renderPlots(plots) {
     const body = document.getElementById('plots-body');
     if (!plots.length) {
-      body.innerHTML = '<tr class="empty-row"><td colspan="9">No plots added yet.</td></tr>';
+      body.innerHTML = '<tr class="empty-row"><td colspan="10">No plots added yet.</td></tr>';
       return;
     }
-    body.innerHTML = plots.map((p) => `
+    body.innerHTML = plots.map((p) => {
+      const due = nextDueOf(p.payments);
+      const dueCell = due
+        ? `${formatCurrency(due.amount)}<div style="font-size:11px; ${due.overdue ? 'color:var(--danger); font-weight:700;' : 'color:var(--text-muted);'}">${formatDate(due.dueDate)}${due.overdue ? ' · OVERDUE' : ''}</div>`
+        : '<span class="text-muted">—</span>';
+      return `
       <tr>
         <td style="font-weight:700;">${escapeHtml(p.plotNumber)}</td>
         <td>${escapeHtml(p.size || '—')}</td>
-        <td>${escapeHtml(p.category || '—')}</td>
+        <td style="text-transform:capitalize;">${escapeHtml(CATEGORY_LABELS[p.category] || p.category || '—')}</td>
         <td>${statusBadge(p.status)}</td>
         <td>${escapeHtml(p.buyerName || '—')}${p.buyerPhone ? `<div class="text-muted" style="font-size:11px;">${escapeHtml(p.buyerPhone)}</div>` : ''}</td>
         <td class="text-right num">${formatCurrency(p.price)}</td>
         <td class="text-right num" style="color:var(--success);">${formatCurrency(p.received)}</td>
         <td class="text-right num" style="color:${p.remaining > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${formatCurrency(p.remaining)}</td>
+        <td class="num">${dueCell}</td>
         <td>
           <div class="row-actions">
             <button class="btn btn-ghost btn-sm" data-pay="${p.id}">Payments</button>
@@ -84,28 +105,45 @@
           </div>
         </td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
     staggerRows(body, { stepMs: 35 });
   }
 
   function plotFields(plot) {
     const v = plot || {};
+    const hasStandardSize = STANDARD_SIZES.includes(v.size);
     return [
       { name: 'plotNumber', label: 'Plot number', required: true, value: v.plotNumber },
-      { name: 'size', label: 'Size (e.g. 5 Marla)', value: v.size },
+      { name: 'size', label: 'Plot size', type: 'select', value: v.size && !hasStandardSize ? OTHER_SIZE : (v.size || STANDARD_SIZES[0]), options: [
+        ...STANDARD_SIZES.map((s) => ({ value: s, label: s })),
+        { value: OTHER_SIZE, label: OTHER_SIZE },
+      ] },
+      { name: 'sizeCustom', label: 'Custom size (only used if "Other" is selected above)', value: v.size && !hasStandardSize ? v.size : '', placeholder: 'e.g. 8 Marla, 2 Kanal' },
       { name: 'category', label: 'Category', type: 'select', value: v.category || 'residential', options: [
-        { value: 'residential', label: 'Residential' }, { value: 'commercial', label: 'Commercial' },
+        { value: 'residential', label: 'Residential' }, { value: 'commercial', label: 'Commercial' }, { value: 'shop', label: 'Shop' },
       ] },
       { name: 'price', label: 'Sale price (Rs.)', type: 'number', step: '0.01', value: v.price != null ? v.price : 0 },
       { name: 'status', label: 'Status', type: 'select', value: v.status || 'available', options: [
         { value: 'available', label: 'Available' }, { value: 'reserved', label: 'Reserved' }, { value: 'sold', label: 'Sold' },
       ] },
-      { name: 'buyerName', label: 'Buyer name', value: v.buyerName },
-      { name: 'buyerPhone', label: 'Buyer phone', value: v.buyerPhone },
-      { name: 'buyerCnic', label: 'Buyer CNIC', value: v.buyerCnic },
+      { name: 'buyerName', label: 'Owner / Buyer name', value: v.buyerName },
+      { name: 'buyerPhone', label: 'Owner / Buyer phone', value: v.buyerPhone },
+      { name: 'buyerCnic', label: 'Owner / Buyer CNIC', value: v.buyerCnic },
       { name: 'saleDate', label: 'Sale/booking date', type: 'date', value: v.saleDate },
       { name: 'notes', label: 'Notes', type: 'textarea', value: v.notes },
     ];
+  }
+
+  // Resolves the select+custom-text pair down to the single "size" string
+  // the backend actually stores, and drops the helper field.
+  function resolvePlotSize(values) {
+    const resolved = Object.assign({}, values);
+    if (resolved.size === OTHER_SIZE) {
+      resolved.size = (resolved.sizeCustom || '').trim() || OTHER_SIZE;
+    }
+    delete resolved.sizeCustom;
+    return resolved;
   }
 
   document.getElementById('add-plot-btn').addEventListener('click', () => {
@@ -114,7 +152,7 @@
       submitLabel: 'Add Plot',
       fields: plotFields(),
       onSubmit: async (values) => {
-        await apiRequest(`/colonies/${colonyId}/plots`, { method: 'POST', body: values });
+        await apiRequest(`/colonies/${colonyId}/plots`, { method: 'POST', body: resolvePlotSize(values) });
         load();
       },
     });
@@ -132,7 +170,7 @@
         submitLabel: 'Save Changes',
         fields: plotFields(plot),
         onSubmit: async (values) => {
-          await apiRequest(`/plots/${plot.id}`, { method: 'PUT', body: values });
+          await apiRequest(`/plots/${plot.id}`, { method: 'PUT', body: resolvePlotSize(values) });
           load();
         },
       });
