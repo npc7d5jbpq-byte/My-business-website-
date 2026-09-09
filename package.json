@@ -24,8 +24,9 @@
     "electron-builder": "^26.15.3",
     "nodemon": "^3.1.4"
   },
+  "author": "Gulberg City Office",
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "build": {
     "appId": "com.gulbergcityoffice.erp",
@@ -33,6 +34,7 @@
     "directories": {
       "output": "release"
     },
+    "publish": null,
     "files": [
       "electron/**/*",
       "server.js",
