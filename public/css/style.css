@@ -412,7 +412,36 @@ tbody tr.row-enter {
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  background: #0a1220 url('../images/login-bg.svg') center center / cover no-repeat;
+  background: #0a1220;
+}
+
+/* Background photo, with the original skyline illustration layered
+   underneath as an automatic fallback if the photo file is ever missing
+   (a failed image layer just renders transparent, revealing the layer
+   below - no JS needed). A very slow, subtle Ken Burns zoom keeps it from
+   feeling like a static stock photo without ever drawing attention to
+   itself - 24s, barely-there, exactly the "premium banking portal" register. */
+.login-bg {
+  position: absolute;
+  inset: -3%;
+  background-image: url('../images/login-bg.jpg'), url('../images/login-bg.svg');
+  background-size: cover, cover;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+  animation: loginBgZoom 24s ease-in-out infinite alternate;
+}
+@keyframes loginBgZoom {
+  from { transform: scale(1); }
+  to { transform: scale(1.045); }
+}
+
+/* Darkens/cools the photo just enough for the card and text to stay
+   legible over any photo, without hiding it. */
+.login-overlay {
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(8, 14, 26, 0.55) 0%, rgba(8, 14, 26, 0.35) 45%, rgba(8, 14, 26, 0.72) 100%);
 }
 
 /* Sparse, very slow floating light particles - deliberately restrained so
@@ -435,6 +464,10 @@ tbody tr.row-enter {
 }
 @media (prefers-reduced-motion: reduce) {
   .login-particle { display: none; }
+  /* An infinite alternating animation would otherwise just strobe rapidly
+     once its duration is crushed to ~0 by the global reduced-motion rule -
+     turn it off outright instead. */
+  .login-bg { animation: none; }
 }
 
 .login-card {

@@ -1,6 +1,15 @@
 // Shared helpers used by every page: API calls, the sidebar/topbar shell,
 // a small generic modal-form system, and formatting utilities.
 
+// Registers the service worker (see sw.js) so the app is installable to a
+// phone's home screen and repeat loads of the static shell are faster.
+// Harmless no-op in the desktop app / any browser without SW support.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* not critical */ });
+  });
+}
+
 async function apiRequest(path, { method = 'GET', body } = {}) {
   const res = await fetch('/api' + path, {
     method,

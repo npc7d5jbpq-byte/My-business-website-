@@ -165,6 +165,31 @@ installer. (They're only defaults — if you run this as a plain web server
 instead, see below, they can also be overridden via a `.env` file without
 touching code.)
 
+## Using it on a phone (iPhone / Android)
+
+The web app (same one the desktop app wraps) is a installable **PWA**
+(Progressive Web App): open it in Safari on an iPhone, tap **Share → Add to
+Home Screen**, and it gets its own icon and opens full-screen like a regular
+app, with its login/dashboard/etc. shell caching for faster repeat loads.
+
+**Important - what this is and isn't:** it is not a native App Store app,
+and it does not carry its own separate copy of the data. To load anything,
+the phone still needs network access to a running instance of this same
+server - either:
+- the office computer, if the phone is on the same Wi-Fi network (open
+  `http://<that PC's local IP>:<port>` in Safari first, then Add to Home
+  Screen so the shortcut remembers that address), or
+- a version of this app hosted somewhere reachable from anywhere (a small
+  cloud server), if you want access away from the office network too.
+
+Ledger data is deliberately kept in one place (see **Data Persistence &
+Backups** above) rather than duplicated onto a phone, so there's only ever
+one source of truth to back up and trust. A true offline-capable native iOS
+app with its own local copy would be a materially bigger, separate project
+(Swift/SwiftUI, Xcode, an Apple Developer account, and a sync strategy
+between phone and office copies) - ask if that's what's actually wanted and
+it can be scoped properly rather than half-built here.
+
 ## Running it as a plain web server instead (optional, for development)
 
 The desktop app is just this same web app wrapped in a native window. You
