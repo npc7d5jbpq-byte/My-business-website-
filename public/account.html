@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Account Settings — Gulberg City Office</title>
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/icon-180.png" />
+<link rel="icon" href="icons/icon-32.png" />
+<meta name="theme-color" content="#0f1a2e" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="GCO" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="main">
+      <header class="topbar" id="topbar"></header>
+      <div class="content">
+        <div class="banner" id="page-banner" hidden></div>
+
+        <div class="card" style="max-width:480px;">
+          <div style="font-weight:700; margin-bottom:6px;">Change Username &amp; Password</div>
+          <p class="text-muted" style="margin:0 0 20px; font-size:12.5px; line-height:1.6;">
+            Currently signed in as <strong id="current-username">—</strong>. Changing these takes effect
+            immediately — whoever uses this app next will need the new username and password to sign in.
+          </p>
+          <form id="account-form">
+            <label class="field" style="margin-bottom:14px;">
+              <span>Current Password</span>
+              <input type="password" name="currentPassword" autocomplete="current-password" required />
+            </label>
+            <label class="field" style="margin-bottom:14px;">
+              <span>New Username</span>
+              <input type="text" name="newUsername" autocomplete="username" required />
+            </label>
+            <label class="field" style="margin-bottom:14px;">
+              <span>New Password <span class="text-muted" style="font-weight:400;">(leave blank to keep the current password)</span></span>
+              <input type="password" name="newPassword" autocomplete="new-password" minlength="6" />
+            </label>
+            <label class="field" style="margin-bottom:20px;">
+              <span>Confirm New Password</span>
+              <input type="password" name="confirmNewPassword" autocomplete="new-password" />
+            </label>
+            <div class="modal-error" id="account-error" hidden></div>
+            <div class="banner banner-success" id="account-success" hidden></div>
+            <button type="submit" class="btn btn-accent" id="account-save-btn">Save Changes</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="modal-root"></div>
+  <script src="js/common.js"></script>
+  <script src="js/account.js"></script>
+</body>
+</html>

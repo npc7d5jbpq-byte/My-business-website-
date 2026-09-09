@@ -159,11 +159,17 @@ workflow run as downloadable artifacts.
 
 ## Changing the login
 
-The username/password are the `ADMIN_USERNAME`/`ADMIN_PASSWORD` defaults in
-`src/auth.js`. For the desktop app, edit those values there and rebuild the
-installer. (They're only defaults — if you run this as a plain web server
-instead, see below, they can also be overridden via a `.env` file without
-touching code.)
+Sign in, then go to **Account Settings** in the sidebar (or **File → Account
+Settings…** in the desktop app's menu). Enter the current password plus the
+new username/password and save — no rebuild, no code changes, and it takes
+effect immediately (the current session stays logged in; anyone signing in
+after that needs the new credentials). The new password is stored hashed,
+never in plain text.
+
+`ADMIN_USERNAME`/`ADMIN_PASSWORD` in `src/auth.js` (overridable via a
+`.env` file when running as a plain web server) are only the *first-run*
+defaults, used until a password is set via Account Settings for the first
+time — after that, whatever was saved there always takes precedence.
 
 ## Using it on a phone (iPhone / Android)
 
@@ -211,14 +217,17 @@ a file changes.
 electron/main.js         Desktop app entry point (window, menu, backup/open-data-folder)
 server.js                Express app (shared by the desktop app and plain `npm start`)
 src/db.js                Simple JSON file data store (no external database needed)
+src/settings.js          Shared small-settings file (secondary backup location, login credentials)
 src/backup.js            Automatic backup scheduler, retention policy, and restore
-src/auth.js              Login check + route-protection middleware
+src/auth.js              Login check, in-app credential changes, route-protection middleware
 src/finance.js           Shared money/date math (paid vs. pending, overdue, sums)
 src/routes/colonies.js   Colonies, plots, milestones, development expenses
 src/routes/assetModule.js  Shared buy/sell/payments logic for the 3 modules below
 src/routes/dashboard.js  Cross-module totals, upcoming dues, yearly summary, ledger
 src/routes/backups.js    Backup list/create/restore API
+src/routes/account.js    Change username/password API
 public/                  Frontend (plain HTML/CSS/JS, no build step required)
 public/backups.html      Backups & Restore page
+public/account.html      Account Settings (change username/password) page
 .github/workflows/       CI workflow that builds the Windows/macOS/Linux installers
 ```

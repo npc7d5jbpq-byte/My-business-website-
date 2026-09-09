@@ -18,12 +18,12 @@
 const fs = require('fs');
 const path = require('path');
 const db = require('./db');
+const { loadSettings, saveSettings } = require('./settings');
 
 // Backups live in a "backups" folder that is a *sibling* of the data
 // folder (e.g. .../userData/data/db.json and .../userData/backups/*.json),
 // so restoring or deleting a backup can never touch the live data file.
 const BACKUPS_DIR = path.join(path.dirname(db.DATA_DIR), 'backups');
-const SETTINGS_FILE = path.join(path.dirname(db.DATA_DIR), 'settings.json');
 // Files are mirrored into a clearly-named subfolder on the secondary drive,
 // rather than dumped in its root, since that drive may hold other things.
 const SECONDARY_SUBFOLDER = 'gulberg-city-office-backups';
@@ -37,26 +37,6 @@ function ensureDir(dir) {
 
 function timestampForFilename(d = new Date()) {
   return d.toISOString().replace(/[:.]/g, '-'); // e.g. 2026-09-09T12-15-00-000Z
-}
-
-// ---- settings (secondary backup location) ----
-
-function loadSettings() {
-  try {
-    const raw = fs.readFileSync(SETTINGS_FILE, 'utf8');
-    return JSON.parse(raw);
-  } catch (err) {
-    return {};
-  }
-}
-
-function saveSettings(patch) {
-  const merged = Object.assign(loadSettings(), patch);
-  ensureDir(path.dirname(SETTINGS_FILE));
-  const tmp = `${SETTINGS_FILE}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(merged, null, 2));
-  fs.renameSync(tmp, SETTINGS_FILE);
-  return merged;
 }
 
 function secondaryStatus() {

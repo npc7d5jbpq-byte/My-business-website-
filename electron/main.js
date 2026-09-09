@@ -49,6 +49,10 @@ function buildMenu() {
           click: () => mainWindow && mainWindow.loadURL(`${serverHandle.url}/backups.html`),
         },
         {
+          label: 'Account Settings…',
+          click: () => mainWindow && mainWindow.loadURL(`${serverHandle.url}/account.html`),
+        },
+        {
           label: 'Open Automatic Backups Folder',
           click: () => shell.openPath(backup.BACKUPS_DIR),
         },
