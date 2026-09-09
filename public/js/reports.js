@@ -6,6 +6,9 @@
   let ledger = [];
   let currentFilter = 'all';
 
+  document.getElementById('yearly-body').innerHTML = skeletonRows(2, 4);
+  document.getElementById('ledger-body').innerHTML = skeletonRows(5, 5);
+
   try {
     const [yearly, ledgerData] = await Promise.all([
       apiRequest('/dashboard/yearly'),
@@ -32,6 +35,7 @@
         <td class="text-right num" style="font-weight:700; color:${y.net >= 0 ? 'var(--success)' : 'var(--danger)'};">${formatCurrency(y.net)}</td>
       </tr>
     `).join('');
+    staggerRows(body, { stepMs: 50 });
   }
 
   function renderLedger() {
@@ -52,6 +56,7 @@
         </td>
       </tr>
     `).join('');
+    staggerRows(body, { stepMs: 25, maxDelayMs: 200 });
   }
 
   document.getElementById('module-filter').addEventListener('click', (e) => {

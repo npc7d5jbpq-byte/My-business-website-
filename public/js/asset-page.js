@@ -14,6 +14,8 @@ function initAssetPage(config) {
     const state = { rows: [] };
     const today = () => new Date().toISOString().slice(0, 10);
 
+    document.getElementById('rows-body').innerHTML = skeletonRows(3, 6);
+
     async function load() {
       try {
         state.rows = await apiRequest(config.apiBase);
@@ -58,6 +60,7 @@ function initAssetPage(config) {
           </td>
         </tr>`;
       }).join('');
+      staggerRows(body, { stepMs: 40 });
     }
 
     function entityFields(row) {
@@ -136,7 +139,7 @@ function initAssetPage(config) {
       const rows = row.payments.length ? row.payments.map((p) => `
         <tr>
           <td>${p.direction === 'paid' ? `<span class="badge badge-danger">Paid to seller</span>` : `<span class="badge badge-success">Received from buyer</span>`}</td>
-          <td class="text-right num">${formatCurrency(p.amount)}</td>
+          <td class="text-right num" style="font-weight:600; color:${p.direction === 'paid' ? 'var(--danger)' : 'var(--success)'};">${formatCurrency(p.amount)}</td>
           <td>${formatDate(p.dueDate)}</td>
           <td>${p.paidDate ? formatDate(p.paidDate) : '<span class="badge badge-warning">Pending</span>'}</td>
           <td class="text-muted">${escapeHtml(p.notes || '')}</td>

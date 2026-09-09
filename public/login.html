@@ -7,6 +7,7 @@
 <link rel="stylesheet" href="css/style.css" />
 </head>
 <body class="login-page">
+  <div class="login-particles" id="login-particles" aria-hidden="true"></div>
   <div class="login-card">
     <div class="login-brand">
       <div class="brand-mark">GCO</div>
@@ -14,16 +15,16 @@
       <p>Property Record &amp; Ledger System</p>
     </div>
     <form id="login-form">
-      <label class="field">
+      <label class="field field-username">
         <span>Username</span>
         <input type="text" name="username" autocomplete="username" required />
       </label>
-      <label class="field">
+      <label class="field field-password">
         <span>Password</span>
         <input type="password" name="password" autocomplete="current-password" required />
       </label>
       <div class="modal-error" id="login-error" hidden></div>
-      <button type="submit" class="btn btn-accent" id="login-btn">Sign in</button>
+      <button type="submit" class="btn btn-accent" id="login-btn"><span id="login-btn-label">Sign in</span></button>
     </form>
   </div>
   <script src="js/common.js"></script>

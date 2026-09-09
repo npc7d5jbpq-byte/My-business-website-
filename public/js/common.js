@@ -260,3 +260,87 @@ function showBanner(message, type = 'error') {
   el.hidden = false;
   setTimeout(() => { el.hidden = true; }, 5000);
 }
+
+// ---- Animation helpers ----
+// Kept deliberately restrained: small movements, short durations, and every
+// one of them respects prefers-reduced-motion (the CSS rule in style.css
+// collapses animation/transition durations globally for that).
+
+const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Toggles a button between its normal label and a small inline spinner +
+// loading label, used for Sign In and other actions that take a moment.
+function setButtonLoading(button, loading, loadingLabel) {
+  if (!button) return;
+  if (loading) {
+    if (!button.dataset.originalHtml) button.dataset.originalHtml = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = `<span class="btn-spinner"></span><span>${escapeHtml(loadingLabel || 'Please wait…')}</span>`;
+  } else {
+    button.disabled = false;
+    if (button.dataset.originalHtml) {
+      button.innerHTML = button.dataset.originalHtml;
+      delete button.dataset.originalHtml;
+    }
+  }
+}
+
+// Animates a number counting up from 0 to `value` inside `el`, formatting
+// each frame with `formatFn` (defaults to formatCurrency). Skips straight
+// to the final value when the user prefers reduced motion.
+function animateCountUp(el, value, { duration = 700, formatFn = formatCurrency } = {}) {
+  if (!el) return;
+  const target = Number(value) || 0;
+  if (prefersReducedMotion) {
+    el.textContent = formatFn(target);
+    return;
+  }
+  const start = performance.now();
+  const easeOutQuad = (t) => 1 - (1 - t) * (1 - t);
+  function tick(now) {
+    const progress = Math.min(1, (now - start) / duration);
+    const current = target * easeOutQuad(progress);
+    el.textContent = formatFn(current);
+    if (progress < 1) requestAnimationFrame(tick);
+    else el.textContent = formatFn(target);
+  }
+  requestAnimationFrame(tick);
+}
+
+// Applies a small fade/lift-in stagger to a table's rows once they've been
+// rendered, capping the per-row delay so long tables don't crawl in.
+function staggerRows(tbody, { stepMs = 35, maxDelayMs = 300 } = {}) {
+  if (!tbody) return;
+  Array.from(tbody.children).forEach((row, i) => {
+    row.classList.add('row-enter');
+    row.style.animationDelay = `${Math.min(i * stepMs, maxDelayMs)}ms`;
+  });
+}
+
+// A row of skeleton stat-tile placeholders, shown while a page's first
+// data fetch is in flight instead of plain "Loading…" text.
+function skeletonCards(count = 4) {
+  return Array.from({ length: count }, () => `
+    <div class="card skeleton-card">
+      <div class="skeleton-block"></div>
+      <div class="skeleton-block"></div>
+      <div class="skeleton-block"></div>
+    </div>
+  `).join('');
+}
+
+// Skeleton table rows, shown while a list page's first data fetch is in
+// flight.
+function skeletonRows(count = 4, columns = 4) {
+  const cells = Array.from({ length: columns }, () => '<td><div class="skeleton-block skeleton-line"></div></td>').join('');
+  return Array.from({ length: count }, () => `<tr>${cells}</tr>`).join('');
+}
+
+// Animates .progress bars from 0 to their intended width once inserted -
+// build them with data-width="NN" and width:0% inline, then call this.
+function animateProgressBars(container) {
+  const bars = (container || document).querySelectorAll('.progress > div[data-width]');
+  requestAnimationFrame(() => {
+    bars.forEach((bar) => { bar.style.width = `${bar.dataset.width}%`; });
+  });
+}

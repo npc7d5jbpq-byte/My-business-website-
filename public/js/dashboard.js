@@ -3,6 +3,12 @@
   if (!session) return;
   setPageTitle('Dashboard');
 
+  // Skeleton placeholders while the first fetch is in flight, instead of
+  // a bare "Loading…" - shaped like the real cards/table that replace them.
+  document.getElementById('overview-tiles').innerHTML = skeletonCards(4);
+  document.getElementById('module-tiles').innerHTML = skeletonCards(4);
+  document.getElementById('upcoming-body').innerHTML = skeletonRows(4, 6);
+
   try {
     const [overview, upcoming] = await Promise.all([
       apiRequest('/dashboard'),
@@ -16,28 +22,25 @@
 
   function renderOverview(data) {
     const t = data.totals;
-    document.getElementById('overview-tiles').innerHTML = `
-      <div class="card stat-tile accent-success">
-        <span class="label">Total Money In</span>
-        <span class="value">${formatCurrency(t.totalMoneyIn)}</span>
-        <span class="sub">Received across all business lines</span>
+    const profitAccent = t.netProfit >= 0 ? 'accent-success' : 'accent-danger';
+
+    const tiles = [
+      { accent: 'accent-success', label: 'Total Money In', value: t.totalMoneyIn, sub: 'Received across all business lines' },
+      { accent: 'accent-danger', label: 'Total Money Out', value: t.totalMoneyOut, sub: 'Spent / paid across all business lines' },
+      { accent: 'accent-info', label: 'Total Receivable', value: t.totalReceivable, sub: 'Still owed to the business' },
+      { accent: profitAccent, label: 'Net Profit', value: t.netProfit, sub: 'Cash-basis profit to date' },
+    ];
+
+    document.getElementById('overview-tiles').innerHTML = tiles.map((tile, i) => `
+      <div class="card stat-tile ${tile.accent} entrance" style="animation-delay:${i * 70}ms">
+        <span class="label">${escapeHtml(tile.label)}</span>
+        <span class="value" data-countup="${tile.value}">Rs. 0</span>
+        <span class="sub">${escapeHtml(tile.sub)}</span>
       </div>
-      <div class="card stat-tile accent-danger">
-        <span class="label">Total Money Out</span>
-        <span class="value">${formatCurrency(t.totalMoneyOut)}</span>
-        <span class="sub">Spent / paid across all business lines</span>
-      </div>
-      <div class="card stat-tile accent-info">
-        <span class="label">Total Receivable</span>
-        <span class="value">${formatCurrency(t.totalReceivable)}</span>
-        <span class="sub">Still owed to the business</span>
-      </div>
-      <div class="card stat-tile accent-gold">
-        <span class="label">Net Profit</span>
-        <span class="value">${formatCurrency(t.netProfit)}</span>
-        <span class="sub">Cash-basis profit to date</span>
-      </div>
-    `;
+    `).join('');
+    document.querySelectorAll('#overview-tiles [data-countup]').forEach((el) => {
+      animateCountUp(el, Number(el.dataset.countup), { duration: 750 });
+    });
 
     const modules = [
       {
@@ -62,8 +65,8 @@
       })),
     ];
 
-    document.getElementById('module-tiles').innerHTML = modules.map((m) => `
-      <a class="card" href="${m.href}" style="display:block">
+    document.getElementById('module-tiles').innerHTML = modules.map((m, i) => `
+      <a class="card entrance" href="${m.href}" style="display:block; animation-delay:${280 + i * 70}ms">
         <div style="font-weight:700; margin-bottom:10px;">${escapeHtml(m.title)}</div>
         ${m.lines.map(([a, b]) => `
           <div style="display:flex; justify-content:space-between; font-size:12.5px; color:var(--text-muted); padding:4px 0;">
@@ -90,5 +93,6 @@
         <td class="num">${formatDate(it.dueDate)} ${it.overdue ? '<div class="overdue-tag">OVERDUE</div>' : ''}</td>
       </tr>
     `).join('');
+    staggerRows(body, { stepMs: 30, maxDelayMs: 240 });
   }
 })();

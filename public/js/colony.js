@@ -11,6 +11,11 @@
   const state = { colony: null };
   const today = () => new Date().toISOString().slice(0, 10);
 
+  document.getElementById('colony-tiles').innerHTML = skeletonCards(8);
+  document.getElementById('plots-body').innerHTML = skeletonRows(3, 9);
+  document.getElementById('milestones-body').innerHTML = skeletonRows(2, 5);
+  document.getElementById('expenses-body').innerHTML = skeletonRows(2, 6);
+
   async function load() {
     try {
       state.colony = await apiRequest(`/colonies/${colonyId}`);
@@ -31,21 +36,26 @@
     renderExpenses(c.expenses);
   }
 
-  function tile(label, value, sub, accent) {
-    return `<div class="card stat-tile ${accent || ''}"><span class="label">${label}</span><span class="value">${value}</span>${sub ? `<span class="sub">${sub}</span>` : ''}</div>`;
+  function tile(label, value, sub, accent, i) {
+    const isNumber = typeof value === 'number';
+    const valueHtml = isNumber ? `<span class="value" data-countup="${value}">Rs. 0</span>` : `<span class="value">${value}</span>`;
+    return `<div class="card stat-tile ${accent || ''} entrance" style="animation-delay:${i * 55}ms"><span class="label">${label}</span>${valueHtml}${sub ? `<span class="sub">${sub}</span>` : ''}</div>`;
   }
 
   function renderTiles(s) {
-    document.getElementById('colony-tiles').innerHTML = [
-      tile('Plots Sold', `${s.sold}/${s.totalPlots}`, `${s.percentSold}% sold · ${s.reserved} reserved · ${s.available} available`),
-      tile('Total Received', formatCurrency(s.totalReceived), 'From buyers so far', 'accent-success'),
-      tile('Total Receivable', formatCurrency(s.totalReceivable), 'Still owed by buyers', 'accent-info'),
-      tile('Projected Profit', formatCurrency(s.projectedProfit), 'Sale value − cost − all expenses', 'accent-gold'),
-      tile('Acquisition / Dev. Cost', formatCurrency(s.acquisitionCost), 'Cost of the raw colony land'),
-      tile('Expenses Paid', formatCurrency(s.totalExpensesPaid), 'Development spend so far', 'accent-danger'),
-      tile('Expenses Pending', formatCurrency(s.totalExpensesPending), 'Planned but not yet paid'),
-      tile('Cash Profit (so far)', formatCurrency(s.cashProfit), 'Received − cost − expenses paid', 'accent-gold'),
-    ].join('');
+    const tiles = [
+      tile('Plots Sold', `${s.sold}/${s.totalPlots}`, `${s.percentSold}% sold · ${s.reserved} reserved · ${s.available} available`, '', 0),
+      tile('Total Received', s.totalReceived, 'From buyers so far', 'accent-success', 1),
+      tile('Total Receivable', s.totalReceivable, 'Still owed by buyers', 'accent-info', 2),
+      tile('Projected Profit', s.projectedProfit, 'Sale value − cost − all expenses', s.projectedProfit >= 0 ? 'accent-success' : 'accent-danger', 3),
+      tile('Acquisition / Dev. Cost', s.acquisitionCost, 'Cost of the raw colony land', '', 4),
+      tile('Expenses Paid', s.totalExpensesPaid, 'Development spend so far', 'accent-danger', 5),
+      tile('Expenses Pending', s.totalExpensesPending, 'Planned but not yet paid', '', 6),
+      tile('Cash Profit (so far)', s.cashProfit, 'Received − cost − expenses paid', s.cashProfit >= 0 ? 'accent-success' : 'accent-danger', 7),
+    ];
+    const container = document.getElementById('colony-tiles');
+    container.innerHTML = tiles.join('');
+    container.querySelectorAll('[data-countup]').forEach((el) => animateCountUp(el, Number(el.dataset.countup), { duration: 650 }));
   }
 
   // ---- Plots ----
@@ -64,8 +74,8 @@
         <td>${statusBadge(p.status)}</td>
         <td>${escapeHtml(p.buyerName || '—')}${p.buyerPhone ? `<div class="text-muted" style="font-size:11px;">${escapeHtml(p.buyerPhone)}</div>` : ''}</td>
         <td class="text-right num">${formatCurrency(p.price)}</td>
-        <td class="text-right num">${formatCurrency(p.received)}</td>
-        <td class="text-right num">${formatCurrency(p.remaining)}</td>
+        <td class="text-right num" style="color:var(--success);">${formatCurrency(p.received)}</td>
+        <td class="text-right num" style="color:${p.remaining > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${formatCurrency(p.remaining)}</td>
         <td>
           <div class="row-actions">
             <button class="btn btn-ghost btn-sm" data-pay="${p.id}">Payments</button>
@@ -75,6 +85,7 @@
         </td>
       </tr>
     `).join('');
+    staggerRows(body, { stepMs: 35 });
   }
 
   function plotFields(plot) {
@@ -135,7 +146,7 @@
   function paymentsModalHtml(plot) {
     const rows = plot.payments.length ? plot.payments.map((p) => `
       <tr>
-        <td class="text-right num">${formatCurrency(p.amount)}</td>
+        <td class="text-right num" style="color:var(--success); font-weight:600;">${formatCurrency(p.amount)}</td>
         <td>${formatDate(p.dueDate)}</td>
         <td>${p.paidDate ? formatDate(p.paidDate) : '<span class="badge badge-warning">Pending</span>'}</td>
         <td class="text-muted">${escapeHtml(p.notes || '')}</td>
@@ -238,6 +249,7 @@
         </td>
       </tr>
     `).join('');
+    staggerRows(body, { stepMs: 35 });
   }
 
   document.getElementById('add-milestone-btn').addEventListener('click', () => {
@@ -300,7 +312,7 @@
       <tr>
         <td style="font-weight:600;">${escapeHtml(ex.title)}</td>
         <td>${escapeHtml(ex.category || '—')}</td>
-        <td class="text-right num">${formatCurrency(ex.amount)}</td>
+        <td class="text-right num" style="color:var(--danger);">${formatCurrency(ex.amount)}</td>
         <td>${formatDate(ex.dueDate)}</td>
         <td>${ex.paidDate ? formatDate(ex.paidDate) : '<span class="badge badge-warning">Pending</span>'}</td>
         <td>
@@ -312,6 +324,7 @@
         </td>
       </tr>
     `).join('');
+    staggerRows(body, { stepMs: 35 });
   }
 
   function expenseFields(ex) {

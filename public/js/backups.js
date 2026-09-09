@@ -25,6 +25,8 @@
     });
   }
 
+  document.getElementById('backups-body').innerHTML = skeletonRows(4, 4);
+
   async function load() {
     try {
       const data = await apiRequest('/backups');
@@ -77,6 +79,7 @@
         </tr>
       `;
     }).join('');
+    staggerRows(body, { stepMs: 30 });
   }
 
   document.getElementById('secondary-set-btn').addEventListener('click', async () => {
