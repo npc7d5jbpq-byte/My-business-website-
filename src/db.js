@@ -131,4 +131,20 @@ function removeWhere(collection, filterFn) {
   return before - store[collection].length;
 }
 
-module.exports = { list, get, insert, update, remove, removeWhere, COLLECTIONS, DATA_DIR, DB_FILE };
+// Replaces every record with the contents of a backup file (used by the
+// restore flow in src/backup.js). The backup is fully parsed and validated
+// *before* db.json is touched, so a corrupt or unreadable backup file never
+// damages the live data - it just throws and nothing changes.
+function restoreFromFile(sourceFilePath) {
+  const raw = fs.readFileSync(sourceFilePath, 'utf8');
+  const parsed = JSON.parse(raw);
+  for (const name of COLLECTIONS) {
+    if (!Array.isArray(parsed[name])) parsed[name] = [];
+  }
+  const tmpFile = `${DB_FILE}.tmp`;
+  fs.writeFileSync(tmpFile, JSON.stringify(parsed, null, 2));
+  fs.renameSync(tmpFile, DB_FILE);
+  store = parsed;
+}
+
+module.exports = { list, get, insert, update, remove, removeWhere, restoreFromFile, COLLECTIONS, DATA_DIR, DB_FILE };

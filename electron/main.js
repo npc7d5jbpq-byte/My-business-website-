@@ -21,9 +21,11 @@ process.env.DATA_DIR = dataDir;
 process.env.SESSION_SECRET = crypto.randomBytes(32).toString('hex');
 process.env.COOKIE_SECURE = 'false';
 
-// server.js reads these env vars when it's required below, so they must be
-// set before this line.
+// server.js (and everything it requires, including src/db.js and
+// src/backup.js) reads these env vars when it's required below, so they
+// must be set before this line.
 const { start } = require('../server');
+const backup = require('../src/backup');
 
 let mainWindow = null;
 let serverHandle = null;
@@ -40,6 +42,15 @@ function buildMenu() {
         {
           label: 'Open Data Folder',
           click: () => shell.openPath(dataDir),
+        },
+        { type: 'separator' },
+        {
+          label: 'Backups && Restore…',
+          click: () => mainWindow && mainWindow.loadURL(`${serverHandle.url}/backups.html`),
+        },
+        {
+          label: 'Open Automatic Backups Folder',
+          click: () => shell.openPath(backup.BACKUPS_DIR),
         },
         { type: 'separator' },
         { role: 'quit' },
@@ -128,6 +139,9 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  // Capture a final snapshot of anything edited since the last scheduled
+  // backup before the app (and its embedded server) actually shuts down.
+  backup.backupOnShutdown();
   if (serverHandle) serverHandle.server.close();
   app.quit();
 });

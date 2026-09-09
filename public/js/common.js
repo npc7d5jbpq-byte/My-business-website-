@@ -66,6 +66,7 @@ const NAV_ITEMS = [
   { href: 'shops.html', label: 'Shops', icon: '&#127978;' },
   { href: 'commercial.html', label: 'Commercial Land & Plots', icon: '&#127970;' },
   { href: 'reports.html', label: 'Reports & Ledger', icon: '&#128202;' },
+  { href: 'backups.html', label: 'Backups & Restore', icon: '&#128190;' },
 ];
 
 async function initShell(activeHref) {

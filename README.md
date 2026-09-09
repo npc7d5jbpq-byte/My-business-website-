@@ -27,8 +27,58 @@ machine.
   whole business in one list.
 - **Reports & Ledger** — year-by-year money in/out/net, and a full
   transaction ledger filterable by business line.
-- **One-click backup** — File → Backup Data As… saves a copy of everything
-  to a USB drive, cloud folder, etc.
+- **Automatic, scheduled, multi-copy backups** — see **Data Persistence &
+  Backups** below for exactly where, how often, how many, and how to
+  restore.
+
+## Data Persistence & Backups
+
+**Primary storage — never in-memory, never lost on close/restart.** Every
+single add/edit/delete is written straight to a file on disk the instant it
+happens (`data/db.json` under the app's per-user data folder — see
+"Where your data lives" below). Nothing is held only in memory waiting to be
+saved later, so closing the app, restarting or shutting down the computer,
+or even a crash, does not lose data — whatever was last saved is exactly
+what's there next time the app opens. This part required no new work; it's
+how the app has always stored data.
+
+**Automatic backups — on top of that.** The app also takes independent,
+timestamped snapshot copies automatically, as a safety net against things
+that don't just delete/rewrite that live file. Handled by `src/backup.js`
+and covered by the tests in this repo's history:
+
+| Question | Answer |
+|---|---|
+| **Where is production data stored?** | `data/db.json` inside the app's OS-assigned per-user data folder (e.g. `%APPDATA%\gulberg-city-office-erp\data\db.json` on Windows, `~/Library/Application Support/gulberg-city-office-erp/data/db.json` on macOS, `~/.config/gulberg-city-office-erp/data/db.json` on Linux) — never inside the installed app folder, so an app update/reinstall never touches it. |
+| **Where are backups stored?** | A `backups` folder next to (a sibling of) the data folder, e.g. `%APPDATA%\gulberg-city-office-erp\backups\` — visible in-app on the **Backups & Restore** page, or via the desktop app's **File → Open Automatic Backups Folder**. |
+| **How often are backups taken?** | Once immediately whenever the app starts; every **15 minutes** while it's running, but only if something actually changed since the last backup (no pointless duplicate copies); once more when the app is closed. A **Backup Now** button on the Backups & Restore page also takes one on demand at any time. |
+| **How many copies are retained?** | A rolling ("grandfather-father-son") policy so the folder never grows without bound: **every** backup from the **last 48 hours**, **one per calendar day** for the **last 30 days**, and **one per calendar month** after that, kept **indefinitely**. Each snapshot is a small JSON file (typically KB, not MB), so even years of monthly backups stay negligible in size. |
+| **How does restoring work?** | Open the **Backups & Restore** page in the app, pick any backup from the list (each shows its date/time, whether it was automatic or manual, and its size), click **Restore this backup**, and confirm. The app automatically snapshots the *current* data first (labeled "Safety copy (before a restore)") before overwriting anything, so a restore is itself always reversible by restoring again. No restart is needed — the app reloads with the restored data immediately. |
+
+This was built, then verified directly (not just written and assumed
+correct) before being reported here:
+- Confirmed a "startup" backup is created the moment the app starts.
+- Confirmed an "auto" backup appears after data changes once the interval
+  elapses, and does **not** appear again if nothing changed.
+- Confirmed **Backup Now** creates an on-demand copy immediately.
+- Confirmed restoring an older backup actually replaces the live data (a
+  colony created after that backup disappeared after restoring to it), and
+  that a "pre-restore" safety copy of the pre-restore state was created
+  automatically.
+- Confirmed restoring a nonexistent/invalid filename fails safely with no
+  changes made, including a path-traversal attempt (`../../etc/passwd`),
+  which is rejected because restore only ever accepts a filename that
+  already exists in the backups folder — it never opens an arbitrary path.
+- Unit-tested the retention policy directly against synthetic timestamps
+  spanning 14 months of daily backups: confirmed every backup within 48
+  hours survives, exactly one per calendar day survives for the 2-30 day
+  range, and exactly one per calendar month survives beyond that.
+
+**In short:** data is durable from the moment it's entered (synchronous
+disk writes, not in-memory), and is additionally protected by automatic
+snapshots on a schedule with bounded, sensible retention and an in-app
+restore flow — all running locally, all confirmed working before being
+described here.
 
 ## Installing it on the office computer
 
@@ -49,10 +99,13 @@ window and menu. Sign in with the username and password you were given.
 file on this computer (not on the internet), in a folder Windows/macOS/Linux
 sets aside for the app's own data — this is separate from wherever the app
 itself is installed, so reinstalling or updating the app never touches your
-data. Use **File → Open Data Folder** in the app to see it, and **File →
-Backup Data As…** regularly to save a safety copy somewhere else (a USB
-drive, an email to yourself, a cloud folder) — that backup file is the only
-copy of your records outside this one computer.
+data. The app also takes automatic backups on a schedule (see **Data
+Persistence & Backups** above for exactly where/how often/how many/how to
+restore). Use **File → Open Data Folder** or the in-app **Backups &
+Restore** page to see everything, and **File → Backup Data As…**
+occasionally to save an extra copy somewhere else entirely (a USB drive, an
+email to yourself, a cloud folder) — since the automatic backups above,
+useful as they are, still live on this same computer.
 
 ## Building the installer (for whoever maintains this app)
 
@@ -103,11 +156,14 @@ a file changes.
 electron/main.js         Desktop app entry point (window, menu, backup/open-data-folder)
 server.js                Express app (shared by the desktop app and plain `npm start`)
 src/db.js                Simple JSON file data store (no external database needed)
+src/backup.js            Automatic backup scheduler, retention policy, and restore
 src/auth.js              Login check + route-protection middleware
 src/finance.js           Shared money/date math (paid vs. pending, overdue, sums)
 src/routes/colonies.js   Colonies, plots, milestones, development expenses
 src/routes/assetModule.js  Shared buy/sell/payments logic for the 3 modules below
 src/routes/dashboard.js  Cross-module totals, upcoming dues, yearly summary, ledger
+src/routes/backups.js    Backup list/create/restore API
 public/                  Frontend (plain HTML/CSS/JS, no build step required)
+public/backups.html      Backups & Restore page
 .github/workflows/       CI workflow that builds the Windows/macOS/Linux installers
 ```

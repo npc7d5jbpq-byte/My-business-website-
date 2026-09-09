@@ -7,7 +7,9 @@ const session = require('express-session');
 const { checkCredentials, requireAuth } = require('./src/auth');
 const { router: coloniesRouter } = require('./src/routes/colonies');
 const dashboardRouter = require('./src/routes/dashboard');
+const backupsRouter = require('./src/routes/backups');
 const { createAssetRouter } = require('./src/routes/assetModule');
+const backup = require('./src/backup');
 
 function buildApp() {
   const app = express();
@@ -55,6 +57,7 @@ function buildApp() {
   // ---- Protected API ----
   app.use('/api', requireAuth, coloniesRouter);
   app.use('/api', requireAuth, dashboardRouter);
+  app.use('/api', requireAuth, backupsRouter);
   app.use('/api/agricultural', requireAuth, createAssetRouter({
     collection: 'agriculturalLands',
     paymentsCollection: 'agriculturalPayments',
@@ -91,6 +94,12 @@ function start(port) {
     server.once('error', reject);
     server.once('listening', () => {
       const boundPort = server.address().port;
+      // Automatic backups run for the lifetime of the server, in both the
+      // desktop app and plain `node server.js` mode - see src/backup.js for
+      // the schedule/retention policy. BACKUP_INTERVAL_MINUTES is an
+      // advanced override (mainly for testing); it defaults to 15.
+      const intervalMinutes = Number(process.env.BACKUP_INTERVAL_MINUTES) || undefined;
+      backup.startScheduler(intervalMinutes ? { intervalMinutes } : undefined);
       resolve({ server, port: boundPort, url: `http://127.0.0.1:${boundPort}` });
     });
   });
@@ -108,4 +117,13 @@ if (require.main === module) {
       console.error('Failed to start server:', err.message);
       process.exit(1);
     });
+
+  // Take a final backup on a normal Ctrl+C / service stop, so edits made
+  // since the last scheduled backup are still captured.
+  const shutdown = () => {
+    backup.backupOnShutdown();
+    process.exit(0);
+  };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 }

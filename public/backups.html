@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Backups & Restore — Gulberg City Office</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="main">
+      <header class="topbar" id="topbar"></header>
+      <div class="content">
+        <div class="banner" id="page-banner" hidden></div>
+
+        <div class="card" style="margin-bottom:24px;">
+          <div style="font-weight:700; margin-bottom:10px;">How automatic backups work</div>
+          <p class="text-muted" style="margin:0 0 8px; line-height:1.6;">
+            Every change you make is saved to disk immediately, so nothing is ever held only in
+            memory — closing the app, restarting the computer, or a power cut does not lose data.
+            On top of that, this system automatically takes a separate timestamped backup copy:
+            once whenever the app starts, every 15 minutes while it's running if anything changed,
+            and once more when the app is closed.
+          </p>
+          <p class="text-muted" style="margin:0; line-height:1.6;">
+            Backups are kept on a rolling schedule so the folder never grows without bound:
+            <strong>every</strong> backup from the last 48 hours, <strong>one per day</strong> for the
+            last 30 days, and <strong>one per month</strong> after that, forever.
+          </p>
+        </div>
+
+        <div class="grid grid-2" style="margin-bottom:24px;">
+          <div class="card">
+            <div class="label" style="font-size:12.5px; color:var(--text-muted); font-weight:600; text-transform:uppercase; margin-bottom:6px;">Live data file</div>
+            <code id="data-file-path" style="font-size:12.5px; word-break:break-all;">—</code>
+          </div>
+          <div class="card">
+            <div class="label" style="font-size:12.5px; color:var(--text-muted); font-weight:600; text-transform:uppercase; margin-bottom:6px;">Automatic backups folder</div>
+            <code id="backups-dir-path" style="font-size:12.5px; word-break:break-all;">—</code>
+          </div>
+        </div>
+
+        <div class="section-title">
+          <h2>Backup history</h2>
+          <button class="btn btn-accent" id="backup-now-btn">Backup Now</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Date &amp; time</th><th>Type</th><th class="text-right">Size</th><th></th></tr>
+            </thead>
+            <tbody id="backups-body"><tr class="empty-row"><td colspan="4">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="modal-root"></div>
+  <script src="js/common.js"></script>
+  <script src="js/backups.js"></script>
+</body>
+</html>
