@@ -3,3 +3,4 @@ data/db.json
 .env
 *.log
 .DS_Store
+release/

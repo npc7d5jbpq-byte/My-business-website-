@@ -10,7 +10,13 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
+// When run inside the desktop app, electron/main.js sets DATA_DIR to a
+// writable per-user folder (Electron's "userData" path) before this module
+// is loaded, so the business data survives app updates/reinstalls and never
+// needs write access to the app's install folder. Running the server
+// directly (`npm start`, for development) falls back to a local ./data
+// folder next to the project.
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, '..', 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
 const COLLECTIONS = [
@@ -125,4 +131,4 @@ function removeWhere(collection, filterFn) {
   return before - store[collection].length;
 }
 
-module.exports = { list, get, insert, update, remove, removeWhere, COLLECTIONS };
+module.exports = { list, get, insert, update, remove, removeWhere, COLLECTIONS, DATA_DIR, DB_FILE };

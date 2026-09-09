@@ -1,0 +1,46 @@
+name: Build Desktop App
+
+# Builds the installable desktop app for Windows, macOS and Linux.
+# Run it from the Actions tab (Run workflow) whenever you want a fresh
+# installer to hand to the client, or it runs automatically on every push
+# to this branch. Finished installers show up as downloadable artifacts on
+# the workflow run's summary page.
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - claude/new-collaboration-3mvuqm
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build installer
+        run: npm run dist
+        env:
+          # Skip code signing - not needed to hand a build to one client.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: gulberg-city-office-${{ matrix.os }}
+          path: |
+            release/*.exe
+            release/*.dmg
+            release/*.AppImage
+          if-no-files-found: warn
