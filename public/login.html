@@ -24,14 +24,16 @@
       <p>Property Record &amp; Ledger System</p>
     </div>
     <form id="login-form">
-      <label class="field field-username">
-        <span>Username</span>
-        <input type="text" name="username" autocomplete="username" required />
-      </label>
-      <label class="field field-password">
-        <span>Password</span>
-        <input type="password" name="password" autocomplete="current-password" required />
-      </label>
+      <div class="login-fields">
+        <label class="field field-username">
+          <span>Username</span>
+          <input type="text" name="username" autocomplete="username" required />
+        </label>
+        <label class="field field-password">
+          <span>Password</span>
+          <input type="password" name="password" autocomplete="current-password" required />
+        </label>
+      </div>
       <div class="modal-error" id="login-error" hidden></div>
       <button type="submit" class="btn btn-accent" id="login-btn"><span id="login-btn-label">Sign in</span></button>
     </form>
