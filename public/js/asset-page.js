@@ -179,9 +179,18 @@ function initAssetPage(config) {
       `;
     }
 
-    function openPaymentsModal(rowId) {
-      const row = state.rows.find((r) => r.id === rowId);
-      if (!row) return;
+    // The list endpoint only returns each row's summary stats (no payment
+    // history, to keep that response light) - only the single-record detail
+    // endpoint includes the full `payments` array, so it's fetched fresh
+    // here rather than reused from state.rows.
+    async function openPaymentsModal(rowId) {
+      let row;
+      try {
+        row = await apiRequest(`${config.apiBase}/${rowId}`);
+      } catch (err) {
+        showBanner(err.message);
+        return;
+      }
       openCustomModal(`Payments — ${row.title}`, paymentsModalHtml(row), (root) => {
         root.querySelector('#add-payment-form').addEventListener('submit', async (e) => {
           e.preventDefault();

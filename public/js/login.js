@@ -26,13 +26,21 @@
           password: form.elements.password.value,
         },
       });
-      window.location.href = 'index.html';
+      goToDashboard();
     } catch (err) {
       errorBox.textContent = err.message || 'Login failed.';
       errorBox.hidden = false;
       setButtonLoading(btn, false);
     }
   });
+
+  // A smooth fade-out on the whole page before moving to the dashboard,
+  // instead of an abrupt jump - skipped (near-instant) for reduced-motion.
+  function goToDashboard() {
+    const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    document.body.classList.add('page-leaving');
+    setTimeout(() => { window.location.href = 'index.html'; }, reduced ? 50 : 1200);
+  }
 
   // A handful of very slow, sparse drifting light points in the background
   // - deliberately understated so the page still reads as a serious

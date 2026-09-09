@@ -413,7 +413,12 @@ tbody tr.row-enter {
   justify-content: center;
   overflow: hidden;
   background: #0a1220;
+  opacity: 1;
+  transition: opacity 1200ms ease-out;
 }
+/* Applied right after a successful sign-in, just before moving to the
+   dashboard, so it's a smooth fade rather than an abrupt jump. */
+.login-page.page-leaving { opacity: 0; }
 
 /* Background photo, with the original skyline illustration layered
    underneath as an automatic fallback if the photo file is ever missing
