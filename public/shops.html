@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Shops — Gulberg City Office</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="main">
+      <header class="topbar" id="topbar"></header>
+      <div class="content">
+        <div class="banner" id="page-banner" hidden></div>
+        <div class="section-title">
+          <h2 id="page-heading">All shop records</h2>
+          <button class="btn btn-accent" id="add-btn">+ Add</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Shop</th>
+                <th>Status</th>
+                <th>Purchase</th>
+                <th>Sale</th>
+                <th class="text-right">Profit</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="rows-body"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="modal-root"></div>
+  <script src="js/common.js"></script>
+  <script src="js/asset-page.js"></script>
+  <script>
+    initAssetPage({
+      apiBase: '/shops',
+      navHref: 'shops.html',
+      pageTitle: 'Shops',
+      entityNoun: 'Shop',
+      buyerNoun: 'Buyer',
+    });
+  </script>
+</body>
+</html>

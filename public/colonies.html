@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Commercial Colonies — Gulberg City Office</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="main">
+      <header class="topbar" id="topbar"></header>
+      <div class="content">
+        <div class="banner" id="page-banner" hidden></div>
+        <div class="section-title">
+          <h2>All colonies</h2>
+          <button class="btn btn-accent" id="add-colony-btn">+ Add Colony</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Colony</th>
+                <th>Plots</th>
+                <th>% Sold</th>
+                <th class="text-right">Received</th>
+                <th class="text-right">Receivable</th>
+                <th class="text-right">Profit (projected)</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="colonies-body">
+              <tr class="empty-row"><td colspan="7">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="modal-root"></div>
+  <script src="js/common.js"></script>
+  <script src="js/colonies.js"></script>
+</body>
+</html>

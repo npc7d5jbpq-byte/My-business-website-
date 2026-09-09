@@ -1,0 +1,23 @@
+{
+  "name": "gulberg-city-office-erp",
+  "version": "1.0.0",
+  "description": "Real estate record-keeping system for Gulberg City Office - colonies, plots, agricultural land, shops and commercial land/plot tracking with full payment ledgers.",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

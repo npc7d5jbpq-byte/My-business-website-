@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Colony — Gulberg City Office</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="main">
+      <header class="topbar" id="topbar"></header>
+      <div class="content">
+        <a class="back-link" href="colonies.html">&larr; Back to Colonies</a>
+        <div class="banner" id="page-banner" hidden></div>
+
+        <div class="detail-header">
+          <div>
+            <h1 id="colony-name">Loading…</h1>
+            <div class="meta" id="colony-location"></div>
+          </div>
+          <div class="row-actions">
+            <button class="btn btn-ghost" id="edit-colony-btn">Edit Colony</button>
+            <button class="btn btn-danger" id="delete-colony-btn">Delete Colony</button>
+          </div>
+        </div>
+
+        <div class="grid grid-4" id="colony-tiles" style="margin-top:20px;"></div>
+
+        <div class="section-title">
+          <h2>Plots</h2>
+          <button class="btn btn-accent" id="add-plot-btn">+ Add Plot</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Plot #</th>
+                <th>Size</th>
+                <th>Category</th>
+                <th>Status</th>
+                <th>Buyer</th>
+                <th class="text-right">Price</th>
+                <th class="text-right">Received</th>
+                <th class="text-right">Remaining</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="plots-body"><tr class="empty-row"><td colspan="9">Loading…</td></tr></tbody>
+          </table>
+        </div>
+
+        <div class="section-title">
+          <h2>Development Milestones</h2>
+          <button class="btn btn-accent" id="add-milestone-btn">+ Add Milestone</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Task</th><th>Due date</th><th>Status</th><th>Notes</th><th></th></tr>
+            </thead>
+            <tbody id="milestones-body"><tr class="empty-row"><td colspan="5">Loading…</td></tr></tbody>
+          </table>
+        </div>
+
+        <div class="section-title">
+          <h2>Development Expenses</h2>
+          <button class="btn btn-accent" id="add-expense-btn">+ Add Expense</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Title</th><th>Category</th><th class="text-right">Amount</th><th>Due date</th><th>Paid date</th><th></th></tr>
+            </thead>
+            <tbody id="expenses-body"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="modal-root"></div>
+  <script src="js/common.js"></script>
+  <script src="js/colony.js"></script>
+</body>
+</html>

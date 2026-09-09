@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dashboard — Gulberg City Office</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="main">
+      <header class="topbar" id="topbar"></header>
+      <div class="content">
+        <div class="banner" id="page-banner" hidden></div>
+
+        <div class="grid grid-4" id="overview-tiles"></div>
+
+        <div class="section-title">
+          <h2>Business at a glance</h2>
+        </div>
+        <div class="grid grid-4" id="module-tiles"></div>
+
+        <div class="section-title">
+          <h2>Upcoming &amp; overdue payments / tasks</h2>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Module</th>
+                <th>Details</th>
+                <th>Person</th>
+                <th>Type</th>
+                <th class="text-right">Amount</th>
+                <th>Due date</th>
+              </tr>
+            </thead>
+            <tbody id="upcoming-body">
+              <tr class="empty-row"><td colspan="6">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="modal-root"></div>
+  <script src="js/common.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>

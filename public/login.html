@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sign in — Gulberg City Office</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="login-page">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="brand-mark">GCO</div>
+      <h1>Gulberg City Office</h1>
+      <p>Property Record &amp; Ledger System</p>
+    </div>
+    <form id="login-form">
+      <label class="field">
+        <span>Username</span>
+        <input type="text" name="username" autocomplete="username" required />
+      </label>
+      <label class="field">
+        <span>Password</span>
+        <input type="password" name="password" autocomplete="current-password" required />
+      </label>
+      <div class="modal-error" id="login-error" hidden></div>
+      <button type="submit" class="btn btn-accent" id="login-btn">Sign in</button>
+    </form>
+  </div>
+  <script src="js/common.js"></script>
+  <script src="js/login.js"></script>
+</body>
+</html>
