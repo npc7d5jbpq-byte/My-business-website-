@@ -55,6 +55,31 @@ and covered by the tests in this repo's history:
 | **How many copies are retained?** | A rolling ("grandfather-father-son") policy so the folder never grows without bound: **every** backup from the **last 48 hours**, **one per calendar day** for the **last 30 days**, and **one per calendar month** after that, kept **indefinitely**. Each snapshot is a small JSON file (typically KB, not MB), so even years of monthly backups stay negligible in size. |
 | **How does restoring work?** | Open the **Backups & Restore** page in the app, pick any backup from the list (each shows its date/time, whether it was automatic or manual, and its size), click **Restore this backup**, and confirm. The app automatically snapshots the *current* data first (labeled "Safety copy (before a restore)") before overwriting anything, so a restore is itself always reversible by restoring again. No restart is needed — the app reloads with the restored data immediately. |
 
+**Secondary (off-machine) backup location.** Everything above still lives on
+the one computer running the app — if its hard drive fails, both the data
+and its backups are gone together. To close that gap, point the app at a
+USB drive or a network folder (**Backups & Restore** page, or the desktop
+app's **File → Set Secondary Backup Location (USB / Network)…**, which opens
+a native folder picker) and every backup is automatically mirrored there too
+from then on, with no manual copying required:
+
+- Every backup cycle (startup, the 15-minute auto-check, shutdown, manual,
+  pre-restore) also copies any backup file not yet on that drive over to it,
+  into a `gulberg-city-office-backups` subfolder so it doesn't clutter a
+  drive used for other things too.
+- If the drive isn't plugged in at the time, syncing is **skipped silently**
+  (never blocks or fails the local backup) and retried automatically on the
+  next cycle, or immediately via **Sync Now**.
+- The same 48-hour/30-day/monthly retention policy applies there too, so the
+  secondary drive doesn't fill up either.
+- The Backups & Restore page shows whether it's currently connected, the
+  path, and when it last synced.
+- **Known limitation:** a USB drive can be assigned a different letter
+  (e.g. `E:` one time, `F:` the next) depending on what else is plugged in,
+  which would make the app treat it as "disconnected" until re-pointed at
+  the new letter. For a more reliable target, prefer a network folder path,
+  or a USB drive that's always the only one plugged in.
+
 This was built, then verified directly (not just written and assumed
 correct) before being reported here:
 - Confirmed a "startup" backup is created the moment the app starts.
@@ -73,6 +98,11 @@ correct) before being reported here:
   spanning 14 months of daily backups: confirmed every backup within 48
   hours survives, exactly one per calendar day survives for the 2-30 day
   range, and exactly one per calendar month survives beyond that.
+- Confirmed setting a secondary location rejects a folder that doesn't
+  exist, and accepts and immediately syncs to one that does.
+- Confirmed a backup taken while the secondary drive is disconnected is
+  skipped gracefully (no error, no crash), and that reconnecting it and
+  syncing picks up everything that was missed while it was away.
 
 **In short:** data is durable from the moment it's entered (synchronous
 disk writes, not in-memory), and is additionally protected by automatic

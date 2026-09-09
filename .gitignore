@@ -1,6 +1,7 @@
 node_modules/
 data/db.json
 backups/
+settings.json
 .env
 *.log
 .DS_Store

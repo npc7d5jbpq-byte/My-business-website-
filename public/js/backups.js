@@ -31,9 +31,29 @@
       document.getElementById('data-file-path').textContent = data.dataFile;
       document.getElementById('backups-dir-path').textContent = data.backupsDirectory;
       render(data.backups);
+      renderSecondary(data.secondary);
     } catch (err) {
       showBanner(err.message);
     }
+  }
+
+  function renderSecondary(status) {
+    const el = document.getElementById('secondary-status');
+    const input = document.getElementById('secondary-path-input');
+    if (!status.configured) {
+      el.innerHTML = '<span class="badge badge-muted">Not set up yet</span> <span class="text-muted" style="font-size:12.5px;">— backups only exist on this computer.</span>';
+      input.value = '';
+      return;
+    }
+    if (status.reachable) {
+      const synced = status.lastSyncAt
+        ? `Last synced ${formatDateTime(status.lastSyncAt)}${status.lastSyncCount ? ` (${status.lastSyncCount} file(s) copied that time)` : ' (already up to date)'}.`
+        : 'Not synced yet.';
+      el.innerHTML = `<span class="badge badge-success">Connected</span> <code style="font-size:12.5px;">${escapeHtml(status.path)}</code><div class="text-muted" style="font-size:12px; margin-top:4px;">${escapeHtml(synced)}</div>`;
+    } else {
+      el.innerHTML = `<span class="badge badge-warning">Not connected right now</span> <code style="font-size:12.5px;">${escapeHtml(status.path)}</code><div class="text-muted" style="font-size:12px; margin-top:4px;">Backups will be copied here automatically once it's reconnected.</div>`;
+    }
+    if (!input.value) input.value = status.path;
   }
 
   function render(backups) {
@@ -58,6 +78,42 @@
       `;
     }).join('');
   }
+
+  document.getElementById('secondary-set-btn').addEventListener('click', async () => {
+    const value = document.getElementById('secondary-path-input').value.trim();
+    if (!value) return showBanner('Enter a folder path first.');
+    try {
+      await apiRequest('/backups/secondary', { method: 'POST', body: { path: value } });
+      showBanner('Secondary backup location set.', 'success');
+      load();
+    } catch (err) {
+      showBanner(err.message);
+    }
+  });
+
+  document.getElementById('secondary-sync-btn').addEventListener('click', async () => {
+    try {
+      const { result } = await apiRequest('/backups/secondary/sync', { method: 'POST' });
+      if (result.skipped) {
+        showBanner(result.reason === 'not-configured' ? 'No secondary location is set yet.' : 'That location is not currently accessible — check the drive is connected.');
+      } else {
+        showBanner(`Synced. ${result.copied} file(s) copied.`, 'success');
+      }
+      load();
+    } catch (err) {
+      showBanner(err.message);
+    }
+  });
+
+  document.getElementById('secondary-clear-btn').addEventListener('click', async () => {
+    try {
+      await apiRequest('/backups/secondary', { method: 'DELETE' });
+      showBanner('Secondary backup location removed.', 'success');
+      load();
+    } catch (err) {
+      showBanner(err.message);
+    }
+  });
 
   document.getElementById('backup-now-btn').addEventListener('click', async () => {
     try {

@@ -42,6 +42,28 @@
         </div>
 
         <div class="section-title">
+          <h2>Secondary backup location (USB drive / network folder)</h2>
+        </div>
+        <div class="card" style="margin-bottom:24px;">
+          <p class="text-muted" style="margin:0 0 14px; line-height:1.6;">
+            Automatic backups above still live on this same computer. Point this at a USB drive or a
+            network folder and every backup will also be copied there automatically — a real off-machine
+            safety copy, kept in sync without anyone needing to remember. If the drive isn't plugged in
+            when a backup runs, it's simply copied over the next time it's connected.
+          </p>
+          <div id="secondary-status" style="margin-bottom:14px;"></div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+            <input type="text" id="secondary-path-input" placeholder="e.g. E:\ or \\SERVER\Backups" style="flex:1; min-width:240px; padding:9px 11px; border:1px solid var(--border); border-radius:8px; font-size:13.5px;" />
+            <button class="btn btn-primary" id="secondary-set-btn">Set Location</button>
+            <button class="btn btn-ghost" id="secondary-sync-btn">Sync Now</button>
+            <button class="btn btn-ghost" id="secondary-clear-btn">Remove</button>
+          </div>
+          <p class="text-muted" style="margin:10px 0 0; font-size:12px;">
+            On the desktop app, <strong>File → Set Secondary Backup Location</strong> opens a folder picker instead of typing a path.
+          </p>
+        </div>
+
+        <div class="section-title">
           <h2>Backup history</h2>
           <button class="btn btn-accent" id="backup-now-btn">Backup Now</button>
         </div>

@@ -53,6 +53,15 @@ function buildMenu() {
           click: () => shell.openPath(backup.BACKUPS_DIR),
         },
         { type: 'separator' },
+        {
+          label: 'Set Secondary Backup Location (USB / Network)…',
+          click: setSecondaryBackupLocation,
+        },
+        {
+          label: 'Sync Secondary Backup Now',
+          click: syncSecondaryBackupNow,
+        },
+        { type: 'separator' },
         { role: 'quit' },
       ],
     },
@@ -90,6 +99,45 @@ async function backupData() {
   if (canceled || !filePath) return;
   fs.copyFileSync(dbFile, filePath);
   dialog.showMessageBox(mainWindow, { type: 'info', message: `Backup saved to:\n${filePath}` });
+}
+
+async function setSecondaryBackupLocation() {
+  const current = backup.secondaryStatus();
+  const { canceled, filePaths } = await dialog.showOpenDialog(mainWindow, {
+    title: 'Choose a folder on the USB drive or network location for backups',
+    defaultPath: current.path || undefined,
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (canceled || !filePaths[0]) return;
+
+  try {
+    backup.setSecondaryDir(filePaths[0]);
+    const result = backup.syncToSecondary();
+    const copiedMsg = result.skipped ? '' : `\n${result.copied} backup file(s) copied there just now.`;
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      message: `Secondary backup location set to:\n${filePaths[0]}${copiedMsg}\n\nBackups will now be mirrored here automatically whenever this drive/folder is connected.`,
+    });
+  } catch (err) {
+    dialog.showErrorBox('Could not set that location', err.message);
+  }
+}
+
+function syncSecondaryBackupNow() {
+  const status = backup.secondaryStatus();
+  if (!status.configured) {
+    dialog.showMessageBox(mainWindow, { type: 'info', message: 'No secondary backup location is set yet. Use "Set Secondary Backup Location" first.' });
+    return;
+  }
+  const result = backup.syncToSecondary();
+  if (result.skipped) {
+    const reason = result.reason === 'not-reachable'
+      ? `The drive/folder isn't currently accessible:\n${status.path}\n\nMake sure it's connected, then try again.`
+      : `Sync was skipped (${result.reason}).`;
+    dialog.showMessageBox(mainWindow, { type: 'warning', message: reason });
+  } else {
+    dialog.showMessageBox(mainWindow, { type: 'info', message: `Up to date. ${result.copied} file(s) copied just now.` });
+  }
 }
 
 async function createWindow() {
