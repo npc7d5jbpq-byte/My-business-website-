@@ -130,8 +130,13 @@ function initAssetPage(config) {
       }
 
       if (delBtn) {
-        if (!confirm(`Delete this ${config.entityNoun.toLowerCase()} record and its payment history?`)) return;
-        apiRequest(`${config.apiBase}/${delBtn.dataset.delete}`, { method: 'DELETE' }).then(load).catch((err) => showBanner(err.message));
+        withButtonBusy(delBtn, async () => {
+          if (!confirm(`Delete this ${config.entityNoun.toLowerCase()} record and its payment history?`)) return;
+          try {
+            await apiRequest(`${config.apiBase}/${delBtn.dataset.delete}`, { method: 'DELETE' });
+            load();
+          } catch (err) { showBanner(err.message); }
+        })();
       }
     });
 
@@ -159,6 +164,10 @@ function initAssetPage(config) {
             <tbody>${rows}</tbody>
           </table>
         </div>
+        <div class="modal-actions" style="justify-content:flex-start; margin-bottom:16px;">
+          <button type="button" class="btn btn-accent btn-sm" data-open-plan>+ Create Installment Plan</button>
+        </div>
+        <div style="font-weight:700; font-size:13px; margin-bottom:10px;">Add a Single Payment</div>
         <form id="add-payment-form">
           <div class="field-grid">
             <label class="field">
@@ -174,7 +183,7 @@ function initAssetPage(config) {
             <label class="field field-wide"><span>Notes</span><input type="text" name="notes" /></label>
           </div>
           <div class="modal-error" id="payment-form-error" hidden></div>
-          <div class="modal-actions"><button type="submit" class="btn btn-primary">Add Payment</button></div>
+          <div class="modal-actions"><button type="submit" class="btn btn-primary" id="add-payment-submit">Add Payment</button></div>
         </form>
       `;
     }
@@ -192,10 +201,12 @@ function initAssetPage(config) {
         return;
       }
       openCustomModal(`Payments — ${row.title}`, paymentsModalHtml(row), (root) => {
+        const submitBtn = root.querySelector('#add-payment-submit');
         root.querySelector('#add-payment-form').addEventListener('submit', async (e) => {
           e.preventDefault();
           const form = e.target;
           const errBox = root.querySelector('#payment-form-error');
+          setButtonLoading(submitBtn, true, 'Adding…');
           try {
             await apiRequest(`${config.apiBase}/${rowId}/payments`, {
               method: 'POST',
@@ -212,26 +223,75 @@ function initAssetPage(config) {
           } catch (err) {
             errBox.textContent = err.message;
             errBox.hidden = false;
+            setButtonLoading(submitBtn, false);
           }
         });
         root.querySelectorAll('[data-mark-paid]').forEach((btn) => {
-          btn.addEventListener('click', async () => {
+          btn.addEventListener('click', withButtonBusy(btn, async () => {
             try {
               await apiRequest(`${config.apiBase}/payments/${btn.dataset.markPaid}`, { method: 'PUT', body: { paidDate: today() } });
               await load();
               openPaymentsModal(rowId);
             } catch (err) { showBanner(err.message); }
-          });
+          }));
         });
         root.querySelectorAll('[data-delete-payment]').forEach((btn) => {
-          btn.addEventListener('click', async () => {
+          btn.addEventListener('click', withButtonBusy(btn, async () => {
             if (!confirm('Delete this payment record?')) return;
             try {
               await apiRequest(`${config.apiBase}/payments/${btn.dataset.deletePayment}`, { method: 'DELETE' });
               await load();
               openPaymentsModal(rowId);
             } catch (err) { showBanner(err.message); }
-          });
+          }));
+        });
+        root.querySelector('[data-open-plan]').addEventListener('click', () => openInstallmentPlanModal(rowId, row.title));
+      });
+    }
+
+    function openInstallmentPlanModal(rowId, title) {
+      openCustomModal(`Create Installment Plan — ${title}`, `<form id="plan-form">${installmentPlanFormHtml({ includeDirection: true })}</form>`, (root) => {
+        initInstallmentPlanRows(root);
+        root.querySelector('[data-plan-cancel]').addEventListener('click', () => openPaymentsModal(rowId));
+        root.querySelector('#plan-form').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const errBox = root.querySelector('#plan-error');
+          const submitBtn = root.querySelector('[data-plan-submit]');
+          const direction = root.querySelector('[name=planDirection]').value;
+          const { upfrontAmount, upfrontDate, installments } = collectInstallmentPlan(root);
+          if (upfrontAmount <= 0 && !installments.length) {
+            errBox.textContent = 'Enter an upfront amount and/or at least one installment.';
+            errBox.hidden = false;
+            return;
+          }
+          const missingDate = installments.find((row) => !row.dueDate);
+          if (missingDate) {
+            errBox.textContent = 'Every installment needs a due date (type months-after, or pick a date directly).';
+            errBox.hidden = false;
+            return;
+          }
+          errBox.hidden = true;
+          setButtonLoading(submitBtn, true, 'Creating…');
+          try {
+            if (upfrontAmount > 0) {
+              await apiRequest(`${config.apiBase}/${rowId}/payments`, {
+                method: 'POST',
+                body: { direction, amount: upfrontAmount, paidDate: upfrontDate, notes: 'Upfront / Bayana' },
+              });
+            }
+            for (const row of installments) {
+              await apiRequest(`${config.apiBase}/${rowId}/payments`, {
+                method: 'POST',
+                body: { direction, amount: row.amount, dueDate: row.dueDate, notes: 'Installment' },
+              });
+            }
+            await load();
+            openPaymentsModal(rowId);
+          } catch (err) {
+            errBox.textContent = err.message;
+            errBox.hidden = false;
+            setButtonLoading(submitBtn, false);
+          }
         });
       });
     }

@@ -46,7 +46,7 @@
     animateProgressBars(body);
 
     body.querySelectorAll('[data-delete]').forEach((btn) => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', withButtonBusy(btn, async () => {
         if (!confirm('Delete this colony and all of its plots, payments, milestones and expenses? This cannot be undone.')) return;
         try {
           await apiRequest(`/colonies/${btn.dataset.delete}`, { method: 'DELETE' });
@@ -54,7 +54,7 @@
         } catch (err) {
           showBanner(err.message);
         }
-      });
+      }));
     });
   }
 

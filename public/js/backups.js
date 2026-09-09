@@ -82,7 +82,8 @@
     staggerRows(body, { stepMs: 30 });
   }
 
-  document.getElementById('secondary-set-btn').addEventListener('click', async () => {
+  const secondarySetBtn = document.getElementById('secondary-set-btn');
+  secondarySetBtn.addEventListener('click', withButtonBusy(secondarySetBtn, async () => {
     const value = document.getElementById('secondary-path-input').value.trim();
     if (!value) return showBanner('Enter a folder path first.');
     try {
@@ -92,9 +93,10 @@
     } catch (err) {
       showBanner(err.message);
     }
-  });
+  }));
 
-  document.getElementById('secondary-sync-btn').addEventListener('click', async () => {
+  const secondarySyncBtn = document.getElementById('secondary-sync-btn');
+  secondarySyncBtn.addEventListener('click', withButtonBusy(secondarySyncBtn, async () => {
     try {
       const { result } = await apiRequest('/backups/secondary/sync', { method: 'POST' });
       if (result.skipped) {
@@ -106,9 +108,10 @@
     } catch (err) {
       showBanner(err.message);
     }
-  });
+  }));
 
-  document.getElementById('secondary-clear-btn').addEventListener('click', async () => {
+  const secondaryClearBtn = document.getElementById('secondary-clear-btn');
+  secondaryClearBtn.addEventListener('click', withButtonBusy(secondaryClearBtn, async () => {
     try {
       await apiRequest('/backups/secondary', { method: 'DELETE' });
       showBanner('Secondary backup location removed.', 'success');
@@ -116,9 +119,10 @@
     } catch (err) {
       showBanner(err.message);
     }
-  });
+  }));
 
-  document.getElementById('backup-now-btn').addEventListener('click', async () => {
+  const backupNowBtn = document.getElementById('backup-now-btn');
+  backupNowBtn.addEventListener('click', withButtonBusy(backupNowBtn, async () => {
     try {
       await apiRequest('/backups', { method: 'POST' });
       showBanner('Backup created.', 'success');
@@ -126,7 +130,7 @@
     } catch (err) {
       showBanner(err.message);
     }
-  });
+  }));
 
   document.getElementById('backups-body').addEventListener('click', (e) => {
     const btn = e.target.closest('[data-restore]');

@@ -354,3 +354,119 @@ function animateProgressBars(container) {
     bars.forEach((bar) => { bar.style.width = `${bar.dataset.width}%`; });
   });
 }
+
+// Wraps a click handler so the button visibly disables itself (dims, per
+// the existing .btn:disabled style) the instant it's clicked, and a repeat
+// click while the first request is still in flight is simply ignored
+// instead of firing a second request. This is what "I keep clicking and
+// nothing happens" almost always turns out to be - no *visible* reaction
+// to the first click - rather than the app actually being slow.
+function withButtonBusy(button, fn) {
+  return async (...args) => {
+    if (!button || button.disabled) return;
+    button.disabled = true;
+    try {
+      await fn(...args);
+    } finally {
+      button.disabled = false;
+    }
+  };
+}
+
+// ---- Installment plan builder ----
+// Shared by the colony plot payments modal and the agricultural/shops/
+// commercial payments modal: lets an upfront/bayana amount plus any number
+// of follow-up installments be defined in one go (amount + either an exact
+// due date or a quick "due after N months" that fills the date in for you),
+// instead of adding each payment one at a time and hand-calculating dates.
+
+function addMonthsToDate(dateStr, months) {
+  const base = dateStr ? new Date(dateStr) : new Date();
+  if (Number.isNaN(base.getTime())) return '';
+  const d = new Date(base.getTime());
+  d.setMonth(d.getMonth() + (Number(months) || 0));
+  return d.toISOString().slice(0, 10);
+}
+
+function installmentPlanFormHtml({ includeDirection = false } = {}) {
+  const today = new Date().toISOString().slice(0, 10);
+  return `
+    <p class="text-muted" style="margin:0 0 16px; font-size:12.5px; line-height:1.6;">
+      Set the upfront/bayana amount, then add each remaining installment with its own amount -
+      type how many months after the upfront it's due and the date fills in for you, or just pick
+      a date directly.
+    </p>
+    ${includeDirection ? `
+      <label class="field" style="margin-bottom:14px;">
+        <span>Type</span>
+        <select name="planDirection" required>
+          <option value="paid">Paid to seller (money out)</option>
+          <option value="received">Received from buyer (money in)</option>
+        </select>
+      </label>` : ''}
+    <div class="field-grid" style="margin-bottom:6px;">
+      <label class="field"><span>Upfront / Bayana amount (Rs.)</span><input type="number" step="0.01" name="planUpfrontAmount" placeholder="e.g. 20" /></label>
+      <label class="field"><span>Upfront / Bayana date</span><input type="date" name="planUpfrontDate" value="${today}" /></label>
+    </div>
+    <div style="margin:16px 0 8px; font-weight:700; font-size:13px;">Installments</div>
+    <div data-installment-rows></div>
+    <button type="button" class="btn btn-ghost btn-sm" data-add-installment-row>+ Add Installment</button>
+    <div class="modal-error" id="plan-error" hidden style="margin-top:16px;"></div>
+    <div class="modal-actions" style="margin-top:16px;">
+      <button type="button" class="btn btn-ghost" data-plan-cancel>Cancel</button>
+      <button type="submit" class="btn btn-primary" data-plan-submit>Create Plan</button>
+    </div>
+  `;
+}
+
+function installmentRowHtml() {
+  return `
+    <div class="installment-row" data-installment-row style="display:grid; grid-template-columns:1.2fr 1fr 1.2fr auto; gap:8px; margin-bottom:8px; align-items:end;">
+      <label class="field" style="margin:0;"><span>Amount (Rs.)</span><input type="number" step="0.01" class="inst-amount" placeholder="e.g. 30" /></label>
+      <label class="field" style="margin:0;"><span>After (months)</span><input type="number" min="0" step="1" class="inst-months" placeholder="e.g. 1" /></label>
+      <label class="field" style="margin:0;"><span>Due date</span><input type="date" class="inst-duedate" /></label>
+      <button type="button" class="btn btn-ghost btn-sm" data-remove-row title="Remove">&times;</button>
+    </div>
+  `;
+}
+
+// Wires up "+ Add Installment" / remove-row / months-after-auto-fill
+// behaviour for a plan form already inserted into `root`. Starts with two
+// rows pre-added, since a plan is rarely just one installment.
+function initInstallmentPlanRows(root) {
+  const rowsContainer = root.querySelector('[data-installment-rows]');
+  const upfrontDateInput = root.querySelector('[name=planUpfrontDate]');
+
+  function addRow() {
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = installmentRowHtml();
+    const rowEl = wrapper.firstElementChild;
+    rowsContainer.appendChild(rowEl);
+    const monthsInput = rowEl.querySelector('.inst-months');
+    const dueDateInput = rowEl.querySelector('.inst-duedate');
+    monthsInput.addEventListener('input', () => {
+      if (monthsInput.value !== '') {
+        dueDateInput.value = addMonthsToDate(upfrontDateInput.value, monthsInput.value);
+      }
+    });
+    rowEl.querySelector('[data-remove-row]').addEventListener('click', () => rowEl.remove());
+  }
+
+  root.querySelector('[data-add-installment-row]').addEventListener('click', addRow);
+  addRow();
+  addRow();
+}
+
+// Reads the current state of the plan form back out as
+// { upfrontAmount, upfrontDate, installments: [{amount, dueDate}] }.
+function collectInstallmentPlan(root) {
+  const upfrontAmount = Number(root.querySelector('[name=planUpfrontAmount]').value) || 0;
+  const upfrontDate = root.querySelector('[name=planUpfrontDate]').value;
+  const installments = Array.from(root.querySelectorAll('[data-installment-row]'))
+    .map((rowEl) => ({
+      amount: Number(rowEl.querySelector('.inst-amount').value) || 0,
+      dueDate: rowEl.querySelector('.inst-duedate').value,
+    }))
+    .filter((row) => row.amount > 0);
+  return { upfrontAmount, upfrontDate, installments };
+}

@@ -5,7 +5,7 @@
 
   // Skeleton placeholders while the first fetch is in flight, instead of
   // a bare "Loading…" - shaped like the real cards/table that replace them.
-  document.getElementById('overview-tiles').innerHTML = skeletonCards(4);
+  document.getElementById('overview-tiles').innerHTML = skeletonCards(5);
   document.getElementById('module-tiles').innerHTML = skeletonCards(4);
   document.getElementById('upcoming-body').innerHTML = skeletonRows(4, 6);
 
@@ -28,6 +28,7 @@
       { accent: 'accent-success', label: 'Total Money In', value: t.totalMoneyIn, sub: 'Received across all business lines' },
       { accent: 'accent-danger', label: 'Total Money Out', value: t.totalMoneyOut, sub: 'Spent / paid across all business lines' },
       { accent: 'accent-info', label: 'Total Receivable', value: t.totalReceivable, sub: 'Still owed to the business' },
+      { accent: 'accent-danger', label: 'Total Payable', value: t.totalPayable, sub: 'Still owed to sellers / contractors, not yet paid' },
       { accent: profitAccent, label: 'Net Profit', value: t.netProfit, sub: 'Cash-basis profit to date' },
     ];
 
@@ -66,7 +67,7 @@
     ];
 
     document.getElementById('module-tiles').innerHTML = modules.map((m, i) => `
-      <a class="card entrance" href="${m.href}" style="display:block; animation-delay:${280 + i * 70}ms">
+      <a class="card entrance" href="${m.href}" style="display:block; animation-delay:${350 + i * 70}ms">
         <div style="font-weight:700; margin-bottom:10px;">${escapeHtml(m.title)}</div>
         ${m.lines.map(([a, b]) => `
           <div style="display:flex; justify-content:space-between; font-size:12.5px; color:var(--text-muted); padding:4px 0;">

@@ -176,8 +176,13 @@
       });
     }
     if (delBtn) {
-      if (!confirm('Delete this plot and all of its payment history?')) return;
-      apiRequest(`/plots/${delBtn.dataset.deletePlot}`, { method: 'DELETE' }).then(load).catch((err) => showBanner(err.message));
+      withButtonBusy(delBtn, async () => {
+        if (!confirm('Delete this plot and all of its payment history?')) return;
+        try {
+          await apiRequest(`/plots/${delBtn.dataset.deletePlot}`, { method: 'DELETE' });
+          load();
+        } catch (err) { showBanner(err.message); }
+      })();
     }
   });
 
@@ -204,6 +209,10 @@
           <tbody>${rows}</tbody>
         </table>
       </div>
+      <div class="modal-actions" style="justify-content:flex-start; margin-bottom:16px;">
+        <button type="button" class="btn btn-accent btn-sm" data-open-plan>+ Create Installment Plan</button>
+      </div>
+      <div style="font-weight:700; font-size:13px; margin-bottom:10px;">Add a Single Payment</div>
       <form id="add-payment-form">
         <div class="field-grid">
           <label class="field"><span>Amount (Rs.)</span><input type="number" step="0.01" name="amount" required /></label>
@@ -212,7 +221,7 @@
           <label class="field field-wide"><span>Notes</span><input type="text" name="notes" placeholder="e.g. 2nd installment" /></label>
         </div>
         <div class="modal-error" id="payment-form-error" hidden></div>
-        <div class="modal-actions"><button type="submit" class="btn btn-primary">Add Payment</button></div>
+        <div class="modal-actions"><button type="submit" class="btn btn-primary" id="add-payment-submit">Add Payment</button></div>
       </form>
     `;
   }
@@ -221,10 +230,12 @@
     const plot = state.colony.plots.find((p) => p.id === plotId);
     if (!plot) return;
     openCustomModal(`Payments — Plot ${plot.plotNumber}`, paymentsModalHtml(plot), (root) => {
+      const submitBtn = root.querySelector('#add-payment-submit');
       root.querySelector('#add-payment-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const form = e.target;
         const errBox = root.querySelector('#payment-form-error');
+        setButtonLoading(submitBtn, true, 'Adding…');
         try {
           await apiRequest(`/plots/${plotId}/payments`, {
             method: 'POST',
@@ -240,26 +251,76 @@
         } catch (err) {
           errBox.textContent = err.message;
           errBox.hidden = false;
+          setButtonLoading(submitBtn, false);
         }
       });
       root.querySelectorAll('[data-mark-paid]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
+        btn.addEventListener('click', withButtonBusy(btn, async () => {
           try {
             await apiRequest(`/plot-payments/${btn.dataset.markPaid}`, { method: 'PUT', body: { paidDate: today() } });
             await load();
             openPlotPaymentsModal(plotId);
           } catch (err) { showBanner(err.message); }
-        });
+        }));
       });
       root.querySelectorAll('[data-delete-payment]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
+        btn.addEventListener('click', withButtonBusy(btn, async () => {
           if (!confirm('Delete this payment record?')) return;
           try {
             await apiRequest(`/plot-payments/${btn.dataset.deletePayment}`, { method: 'DELETE' });
             await load();
             openPlotPaymentsModal(plotId);
           } catch (err) { showBanner(err.message); }
-        });
+        }));
+      });
+      root.querySelector('[data-open-plan]').addEventListener('click', () => openPlotInstallmentPlanModal(plotId));
+    });
+  }
+
+  function openPlotInstallmentPlanModal(plotId) {
+    const plot = state.colony.plots.find((p) => p.id === plotId);
+    if (!plot) return;
+    openCustomModal(`Create Installment Plan — Plot ${plot.plotNumber}`, `<form id="plan-form">${installmentPlanFormHtml({ includeDirection: false })}</form>`, (root) => {
+      initInstallmentPlanRows(root);
+      root.querySelector('[data-plan-cancel]').addEventListener('click', () => openPlotPaymentsModal(plotId));
+      root.querySelector('#plan-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errBox = root.querySelector('#plan-error');
+        const submitBtn = root.querySelector('[data-plan-submit]');
+        const { upfrontAmount, upfrontDate, installments } = collectInstallmentPlan(root);
+        if (upfrontAmount <= 0 && !installments.length) {
+          errBox.textContent = 'Enter an upfront amount and/or at least one installment.';
+          errBox.hidden = false;
+          return;
+        }
+        const missingDate = installments.find((row) => !row.dueDate);
+        if (missingDate) {
+          errBox.textContent = 'Every installment needs a due date (type months-after, or pick a date directly).';
+          errBox.hidden = false;
+          return;
+        }
+        errBox.hidden = true;
+        setButtonLoading(submitBtn, true, 'Creating…');
+        try {
+          if (upfrontAmount > 0) {
+            await apiRequest(`/plots/${plotId}/payments`, {
+              method: 'POST',
+              body: { amount: upfrontAmount, paidDate: upfrontDate, notes: 'Upfront / Bayana' },
+            });
+          }
+          for (const row of installments) {
+            await apiRequest(`/plots/${plotId}/payments`, {
+              method: 'POST',
+              body: { amount: row.amount, dueDate: row.dueDate, notes: 'Installment' },
+            });
+          }
+          await load();
+          openPlotPaymentsModal(plotId);
+        } catch (err) {
+          errBox.textContent = err.message;
+          errBox.hidden = false;
+          setButtonLoading(submitBtn, false);
+        }
       });
     });
   }
@@ -311,7 +372,12 @@
     const editBtn = e.target.closest('[data-edit-milestone]');
     const delBtn = e.target.closest('[data-delete-milestone]');
     if (doneBtn) {
-      apiRequest(`/milestones/${doneBtn.dataset.completeMilestone}`, { method: 'PUT', body: { status: 'completed', completedDate: today() } }).then(load).catch((err) => showBanner(err.message));
+      withButtonBusy(doneBtn, async () => {
+        try {
+          await apiRequest(`/milestones/${doneBtn.dataset.completeMilestone}`, { method: 'PUT', body: { status: 'completed', completedDate: today() } });
+          load();
+        } catch (err) { showBanner(err.message); }
+      })();
     }
     if (editBtn) {
       const m = state.colony.milestones.find((x) => x.id === editBtn.dataset.editMilestone);
@@ -333,8 +399,13 @@
       });
     }
     if (delBtn) {
-      if (!confirm('Delete this milestone?')) return;
-      apiRequest(`/milestones/${delBtn.dataset.deleteMilestone}`, { method: 'DELETE' }).then(load).catch((err) => showBanner(err.message));
+      withButtonBusy(delBtn, async () => {
+        if (!confirm('Delete this milestone?')) return;
+        try {
+          await apiRequest(`/milestones/${delBtn.dataset.deleteMilestone}`, { method: 'DELETE' });
+          load();
+        } catch (err) { showBanner(err.message); }
+      })();
     }
   });
 
@@ -397,7 +468,12 @@
     const editBtn = e.target.closest('[data-edit-expense]');
     const delBtn = e.target.closest('[data-delete-expense]');
     if (payBtn) {
-      apiRequest(`/expenses/${payBtn.dataset.payExpense}`, { method: 'PUT', body: { paidDate: today() } }).then(load).catch((err) => showBanner(err.message));
+      withButtonBusy(payBtn, async () => {
+        try {
+          await apiRequest(`/expenses/${payBtn.dataset.payExpense}`, { method: 'PUT', body: { paidDate: today() } });
+          load();
+        } catch (err) { showBanner(err.message); }
+      })();
     }
     if (editBtn) {
       const ex = state.colony.expenses.find((x) => x.id === editBtn.dataset.editExpense);
@@ -412,8 +488,13 @@
       });
     }
     if (delBtn) {
-      if (!confirm('Delete this expense?')) return;
-      apiRequest(`/expenses/${delBtn.dataset.deleteExpense}`, { method: 'DELETE' }).then(load).catch((err) => showBanner(err.message));
+      withButtonBusy(delBtn, async () => {
+        if (!confirm('Delete this expense?')) return;
+        try {
+          await apiRequest(`/expenses/${delBtn.dataset.deleteExpense}`, { method: 'DELETE' });
+          load();
+        } catch (err) { showBanner(err.message); }
+      })();
     }
   });
 
@@ -437,7 +518,7 @@
     });
   });
 
-  document.getElementById('delete-colony-btn').addEventListener('click', async () => {
+  document.getElementById('delete-colony-btn').addEventListener('click', withButtonBusy(document.getElementById('delete-colony-btn'), async () => {
     if (!confirm('Delete this entire colony, including all plots, payments, milestones and expenses? This cannot be undone.')) return;
     try {
       await apiRequest(`/colonies/${colonyId}`, { method: 'DELETE' });
@@ -445,7 +526,7 @@
     } catch (err) {
       showBanner(err.message);
     }
-  });
+  }));
 
   load();
 })();
