@@ -74,61 +74,52 @@
   function render(data) {
     const { payment, direction } = data;
     const isPaid = Boolean(payment.paidDate);
-    const amountClass = direction === 'paid' ? 'amt-out' : 'amt-in';
+    const printedAt = new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
     receiptEl.innerHTML = `
-      <div class="r-header">
-        <div class="r-brand">
-          <div class="r-logo">GCO</div>
-          <div class="r-brand-text">
-            <strong>Gulberg City Office</strong>
-            <span>Property Record &amp; Ledger System</span>
-          </div>
-        </div>
-        <div class="r-meta">
-          <div class="r-title">PAYMENT RECEIPT</div>
-          <div class="r-line">Receipt No: <strong>${escapeHtml(shortReceiptNo(payment.id))}</strong></div>
-          <div class="r-line">Date: <strong>${escapeHtml(formatDate(payment.paidDate || payment.dueDate))}</strong></div>
-          <div class="r-line">Printed: ${escapeHtml(new Date().toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }))}</div>
-        </div>
+      <div class="r-center">
+        <div class="r-brand-name">GULBERG CITY OFFICE</div>
+        <div class="r-brand-tag">Property Record &amp; Ledger System</div>
+        <div class="r-title">PAYMENT RECEIPT</div>
+      </div>
+      <hr class="r-rule" />
+
+      <div class="r-row"><span>Receipt No</span><span class="v">${escapeHtml(shortReceiptNo(payment.id))}</span></div>
+      <div class="r-row"><span>Date</span><span class="v">${escapeHtml(formatDate(payment.paidDate || payment.dueDate))}</span></div>
+      <div class="r-row"><span>Printed</span><span class="v">${escapeHtml(printedAt)}</span></div>
+      <hr class="r-rule" />
+
+      <div class="r-section-title">${escapeHtml(data.partyLabel.toUpperCase())}</div>
+      <div class="r-party-name">${escapeHtml(data.partyName)}</div>
+      ${data.partyPhone ? `<div class="r-party-sub">${escapeHtml(data.partyPhone)}</div>` : ''}
+      <hr class="r-rule" />
+
+      <div class="r-section-title">PROPERTY</div>
+      <div class="r-party-name" style="font-size:12px;">${escapeHtml(data.heading)}</div>
+      ${data.description ? `<div class="r-party-sub">${escapeHtml(data.description)}</div>` : ''}
+      <hr class="r-rule" />
+
+      <div class="r-item">
+        <div class="r-item-desc">${escapeHtml(payment.notes || (direction === 'paid' ? 'Payment made' : 'Payment received'))}</div>
+        <div class="r-item-status">${isPaid ? '[ PAID ]' : `[ PENDING${payment.dueDate ? ' - due ' + formatDate(payment.dueDate) : ''} ]`}</div>
+        <div class="r-item-amt">${direction === 'paid' ? '-' : '+'} ${formatCurrency(payment.amount)}</div>
+      </div>
+      <hr class="r-rule" />
+
+      <div class="r-summary-row"><span>Total Price</span><span>${formatCurrency(data.totalPrice)}</span></div>
+      <div class="r-summary-row"><span>${direction === 'paid' ? 'Total Paid to Date' : 'Total Received to Date'}</span><span>${formatCurrency(data.totalSettled)}</span></div>
+      <hr class="r-rule solid" />
+      <div class="r-summary-row remaining"><span>Balance Due</span><span>${formatCurrency(data.remaining)}</span></div>
+
+      <div class="r-sig">
+        <div class="r-sig-line"></div>Received By
+        <div class="r-sig-line"></div>Authorized Signature (Gulberg City Office)
       </div>
 
-      <div class="r-section">
-        <div class="r-section-title">${escapeHtml(data.partyLabel)}</div>
-        <div class="r-party-name">${escapeHtml(data.partyName)}</div>
-        ${data.partyPhone ? `<div class="r-party-sub">${escapeHtml(data.partyPhone)}</div>` : ''}
+      <div class="r-footer">
+        <div class="stars">* * *</div>
+        This is a computer-generated receipt<br />from the Gulberg City Office record system.
       </div>
-
-      <div class="r-section">
-        <div class="r-section-title">Property</div>
-        <div class="r-party-name" style="font-size:14.5px;">${escapeHtml(data.heading)}</div>
-        ${data.description ? `<div class="r-party-sub">${escapeHtml(data.description)}</div>` : ''}
-      </div>
-
-      <table class="r-table">
-        <thead><tr><th>Description</th><th style="text-align:right;">Amount</th></tr></thead>
-        <tbody>
-          <tr>
-            <td>${escapeHtml(payment.notes || (direction === 'paid' ? 'Payment made' : 'Payment received'))}
-              <div style="margin-top:3px;"><span class="r-status ${isPaid ? 'paid' : 'pending'}">${isPaid ? 'PAID' : `PENDING${payment.dueDate ? ' · due ' + formatDate(payment.dueDate) : ''}`}</span></div>
-            </td>
-            <td class="amt ${amountClass}" style="font-weight:700;">${formatCurrency(payment.amount)}</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <div class="r-summary">
-        <div class="r-summary-row total"><span>Total Price</span><span class="amt">${formatCurrency(data.totalPrice)}</span></div>
-        <div class="r-summary-row"><span>${direction === 'paid' ? 'Total Paid to Date' : 'Total Received to Date'}</span><span class="amt ${amountClass}">${formatCurrency(data.totalSettled)}</span></div>
-        <div class="r-summary-row remaining"><span>Remaining Balance</span><span class="amt">${formatCurrency(data.remaining)}</span></div>
-      </div>
-
-      <div class="r-signatures">
-        <div class="r-sig"><div class="line"></div><div class="label">Received By</div></div>
-        <div class="r-sig"><div class="line"></div><div class="label">Authorized Signature (Gulberg City Office)</div></div>
-      </div>
-
-      <div class="r-footer-note">This is a computer-generated receipt from the Gulberg City Office record system.</div>
     `;
     receiptEl.hidden = false;
   }

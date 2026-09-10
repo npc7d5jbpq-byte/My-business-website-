@@ -29,12 +29,15 @@ machine.
   transaction ledger filterable by business line.
 - **Printable receipts** — every payment (a plot installment, or a paid/
   received entry on agricultural land, a shop, or commercial land) has a
-  **Print** button that opens a formal, letterheaded receipt — logo, receipt
-  number, date, buyer/seller, what was sold, this payment plus total price/
-  paid/remaining — ready to print on any printer connected to the computer
-  via the normal Windows print dialog (Print → pick your printer). No
-  special printer setup or drivers needed beyond installing the printer in
-  Windows itself, the way you would for any other program.
+  **Print** button that opens a receipt formatted for a small **80mm
+  receipt/thermal printer** — the narrow roll-paper printers used at shop
+  and restaurant counters: business name, receipt number, date, buyer/
+  seller, what was sold, this payment plus total price/paid/remaining, and
+  signature lines. It prints on any printer connected to the computer via
+  the normal Windows print dialog (Print → pick your printer), thermal or
+  a regular A4/letter printer alike — no special driver or printer-
+  integration code needed beyond installing the printer in Windows itself,
+  the way you would for any other program.
 - **Automatic, scheduled, multi-copy backups** — see **Data Persistence &
   Backups** below for exactly where, how often, how many, and how to
   restore.

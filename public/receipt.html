@@ -7,101 +7,84 @@
 <link rel="icon" href="icons/icon-32.png" />
 <style>
   :root {
-    --navy: #0f1a2e;
-    --accent: #c9973f;
-    --accent-dark: #a97b28;
-    --text: #1c2434;
-    --text-muted: #6b7480;
-    --border: #d8d5cc;
-    --success: #16a34a;
-    --danger: #dc2626;
+    --receipt-width: 80mm;
+    --text: #000;
+    --muted: #444;
+    --rule: #000;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
   body {
-    font-family: 'Segoe UI', system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
-    background: #eceae4;
+    font-family: 'Courier New', 'Consolas', ui-monospace, monospace;
+    background: #d9d9d9;
     color: var(--text);
-    font-size: 14px;
+    font-size: 12px;
   }
 
   .toolbar {
     position: sticky; top: 0; z-index: 10;
     display: flex; justify-content: center; gap: 10px;
-    padding: 14px; background: var(--navy);
+    padding: 14px; background: #0f1a2e;
   }
   .toolbar button {
     border: none; border-radius: 8px; padding: 9px 18px; font-size: 13.5px; font-weight: 700; cursor: pointer;
+    font-family: 'Segoe UI', system-ui, sans-serif;
   }
-  #print-btn { background: var(--accent); color: #1c1404; }
+  #print-btn { background: #c9973f; color: #1c1404; }
   #close-btn { background: rgba(255,255,255,0.12); color: #fff; }
+  .toolbar-note { width: 100%; text-align: center; font-family: 'Segoe UI', system-ui, sans-serif; font-size: 11.5px; color: #cfd4dd; margin-top: -4px; }
 
-  .page-wrap { display: flex; justify-content: center; padding: 30px 16px 60px; }
+  .page-wrap { display: flex; flex-direction: column; align-items: center; padding: 26px 16px 60px; }
 
   #receipt {
     background: #fff;
-    width: 100%;
-    max-width: 720px;
-    padding: 40px 44px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
-    border-top: 6px solid var(--accent);
+    width: var(--receipt-width);
+    padding: 10px 4mm 16px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.22);
+    line-height: 1.45;
   }
 
-  .r-header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 20px; border-bottom: 2px solid var(--navy); margin-bottom: 22px; }
-  .r-brand { display: flex; align-items: center; gap: 14px; }
-  .r-logo {
-    width: 52px; height: 52px; border-radius: 12px; flex-shrink: 0;
-    background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-    color: #1c1404; display: flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 15px; letter-spacing: 0.5px;
+  .r-center { text-align: center; }
+  .r-brand-name { font-size: 14px; font-weight: 700; letter-spacing: 0.5px; }
+  .r-brand-tag { font-size: 10.5px; color: var(--muted); margin-top: 2px; }
+  .r-title { font-size: 12px; font-weight: 700; letter-spacing: 1.5px; margin-top: 8px; }
+
+  .r-rule { border: none; border-top: 1px dashed var(--rule); margin: 8px 0; }
+  .r-rule.solid { border-top: 1px solid var(--rule); }
+
+  .r-row { display: flex; justify-content: space-between; gap: 6px; font-size: 11.5px; margin: 2px 0; }
+  .r-row .v { text-align: right; font-weight: 700; }
+
+  .r-section-title { font-size: 10.5px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 2px; }
+  .r-party-name { font-size: 12.5px; font-weight: 700; }
+  .r-party-sub { font-size: 11px; color: var(--muted); }
+
+  .r-item { margin: 4px 0; }
+  .r-item-desc { font-size: 11.5px; }
+  .r-item-status { font-size: 10.5px; font-weight: 700; margin-top: 2px; }
+  .r-item-amt { display: flex; justify-content: flex-end; font-size: 13px; font-weight: 700; margin-top: 2px; }
+
+  .r-summary-row { display: flex; justify-content: space-between; font-size: 11.5px; padding: 2px 0; }
+  .r-summary-row.remaining { font-weight: 700; font-size: 13px; padding-top: 6px; }
+
+  .r-sig { margin-top: 22px; font-size: 10.5px; }
+  .r-sig-line { border-top: 1px dashed #000; margin: 18px 0 3px; }
+
+  .r-footer { text-align: center; font-size: 10.5px; color: var(--muted); margin-top: 14px; }
+  .r-footer .stars { letter-spacing: 4px; margin-bottom: 6px; }
+
+  .r-error {
+    max-width: 400px; margin: 60px auto; text-align: center; color: #b91c1c; font-size: 14px;
+    font-family: 'Segoe UI', system-ui, sans-serif;
   }
-  .r-brand-text strong { display: block; font-size: 18px; }
-  .r-brand-text span { display: block; font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
 
-  .r-meta { text-align: right; }
-  .r-meta .r-title { font-size: 15px; font-weight: 800; letter-spacing: 1px; color: var(--navy); }
-  .r-meta .r-line { font-size: 12.5px; color: var(--text-muted); margin-top: 4px; }
-  .r-meta .r-line strong { color: var(--text); }
-
-  .r-section { margin-bottom: 20px; }
-  .r-section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 700; margin-bottom: 6px; }
-  .r-party-name { font-size: 16px; font-weight: 700; }
-  .r-party-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
-
-  table.r-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
-  table.r-table th {
-    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;
-    color: var(--text-muted); border-bottom: 1px solid var(--border); padding: 8px 0;
-  }
-  table.r-table td { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; }
-  table.r-table td.amt { text-align: right; font-variant-numeric: tabular-nums; }
-
-  .r-summary { margin-top: 6px; }
-  .r-summary-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13.5px; }
-  .r-summary-row.total { font-weight: 700; }
-  .r-summary-row.remaining { font-weight: 800; font-size: 15px; border-top: 2px solid var(--navy); margin-top: 6px; padding-top: 12px; }
-  .r-summary-row .amt { font-variant-numeric: tabular-nums; }
-  .amt-in { color: var(--success); }
-  .amt-out { color: var(--danger); }
-
-  .r-status { display: inline-block; margin-top: 4px; padding: 4px 12px; border-radius: 999px; font-size: 11.5px; font-weight: 800; letter-spacing: 0.4px; }
-  .r-status.paid { background: #e7f7ed; color: var(--success); }
-  .r-status.pending { background: #fef3e2; color: #d97706; }
-
-  .r-signatures { display: flex; justify-content: space-between; margin-top: 56px; gap: 40px; }
-  .r-sig { flex: 1; text-align: center; }
-  .r-sig .line { border-top: 1px solid var(--text); margin-bottom: 6px; padding-top: 30px; }
-  .r-sig .label { font-size: 11.5px; color: var(--text-muted); }
-
-  .r-footer-note { margin-top: 30px; text-align: center; font-size: 11.5px; color: var(--text-muted); }
-
-  .r-error { max-width: 720px; margin: 60px auto; text-align: center; color: var(--danger); font-size: 14px; }
+  @page { size: 80mm auto; margin: 0; }
 
   @media print {
     body { background: #fff; }
-    .toolbar { display: none; }
-    .page-wrap { padding: 0; }
-    #receipt { box-shadow: none; border-top: 6px solid var(--accent); max-width: none; }
+    .no-print { display: none !important; }
+    .page-wrap { padding: 0; align-items: stretch; }
+    #receipt { box-shadow: none; width: 100%; margin: 0; padding: 2mm 4mm 6mm; }
   }
 </style>
 </head>
@@ -110,6 +93,7 @@
     <button id="print-btn">🖨 Print Receipt</button>
     <button id="close-btn">Close</button>
   </div>
+  <div class="toolbar-note no-print">Formatted for an 80mm receipt/thermal printer (the small roll-paper printers used at shops and counters).</div>
   <div class="page-wrap">
     <div id="receipt" hidden></div>
     <div class="r-error" id="receipt-error" hidden></div>
