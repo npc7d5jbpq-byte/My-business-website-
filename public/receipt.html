@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Payment Receipt — Gulberg City Office</title>
+<link rel="icon" href="icons/icon-32.png" />
+<style>
+  :root {
+    --navy: #0f1a2e;
+    --accent: #c9973f;
+    --accent-dark: #a97b28;
+    --text: #1c2434;
+    --text-muted: #6b7480;
+    --border: #d8d5cc;
+    --success: #16a34a;
+    --danger: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+    background: #eceae4;
+    color: var(--text);
+    font-size: 14px;
+  }
+
+  .toolbar {
+    position: sticky; top: 0; z-index: 10;
+    display: flex; justify-content: center; gap: 10px;
+    padding: 14px; background: var(--navy);
+  }
+  .toolbar button {
+    border: none; border-radius: 8px; padding: 9px 18px; font-size: 13.5px; font-weight: 700; cursor: pointer;
+  }
+  #print-btn { background: var(--accent); color: #1c1404; }
+  #close-btn { background: rgba(255,255,255,0.12); color: #fff; }
+
+  .page-wrap { display: flex; justify-content: center; padding: 30px 16px 60px; }
+
+  #receipt {
+    background: #fff;
+    width: 100%;
+    max-width: 720px;
+    padding: 40px 44px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    border-top: 6px solid var(--accent);
+  }
+
+  .r-header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 20px; border-bottom: 2px solid var(--navy); margin-bottom: 22px; }
+  .r-brand { display: flex; align-items: center; gap: 14px; }
+  .r-logo {
+    width: 52px; height: 52px; border-radius: 12px; flex-shrink: 0;
+    background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+    color: #1c1404; display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 15px; letter-spacing: 0.5px;
+  }
+  .r-brand-text strong { display: block; font-size: 18px; }
+  .r-brand-text span { display: block; font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+
+  .r-meta { text-align: right; }
+  .r-meta .r-title { font-size: 15px; font-weight: 800; letter-spacing: 1px; color: var(--navy); }
+  .r-meta .r-line { font-size: 12.5px; color: var(--text-muted); margin-top: 4px; }
+  .r-meta .r-line strong { color: var(--text); }
+
+  .r-section { margin-bottom: 20px; }
+  .r-section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); font-weight: 700; margin-bottom: 6px; }
+  .r-party-name { font-size: 16px; font-weight: 700; }
+  .r-party-sub { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+
+  table.r-table { width: 100%; border-collapse: collapse; margin-bottom: 4px; }
+  table.r-table th {
+    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;
+    color: var(--text-muted); border-bottom: 1px solid var(--border); padding: 8px 0;
+  }
+  table.r-table td { padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+  table.r-table td.amt { text-align: right; font-variant-numeric: tabular-nums; }
+
+  .r-summary { margin-top: 6px; }
+  .r-summary-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13.5px; }
+  .r-summary-row.total { font-weight: 700; }
+  .r-summary-row.remaining { font-weight: 800; font-size: 15px; border-top: 2px solid var(--navy); margin-top: 6px; padding-top: 12px; }
+  .r-summary-row .amt { font-variant-numeric: tabular-nums; }
+  .amt-in { color: var(--success); }
+  .amt-out { color: var(--danger); }
+
+  .r-status { display: inline-block; margin-top: 4px; padding: 4px 12px; border-radius: 999px; font-size: 11.5px; font-weight: 800; letter-spacing: 0.4px; }
+  .r-status.paid { background: #e7f7ed; color: var(--success); }
+  .r-status.pending { background: #fef3e2; color: #d97706; }
+
+  .r-signatures { display: flex; justify-content: space-between; margin-top: 56px; gap: 40px; }
+  .r-sig { flex: 1; text-align: center; }
+  .r-sig .line { border-top: 1px solid var(--text); margin-bottom: 6px; padding-top: 30px; }
+  .r-sig .label { font-size: 11.5px; color: var(--text-muted); }
+
+  .r-footer-note { margin-top: 30px; text-align: center; font-size: 11.5px; color: var(--text-muted); }
+
+  .r-error { max-width: 720px; margin: 60px auto; text-align: center; color: var(--danger); font-size: 14px; }
+
+  @media print {
+    body { background: #fff; }
+    .toolbar { display: none; }
+    .page-wrap { padding: 0; }
+    #receipt { box-shadow: none; border-top: 6px solid var(--accent); max-width: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="toolbar no-print">
+    <button id="print-btn">🖨 Print Receipt</button>
+    <button id="close-btn">Close</button>
+  </div>
+  <div class="page-wrap">
+    <div id="receipt" hidden></div>
+    <div class="r-error" id="receipt-error" hidden></div>
+  </div>
+  <script src="js/common.js"></script>
+  <script src="js/receipt.js"></script>
+</body>
+</html>

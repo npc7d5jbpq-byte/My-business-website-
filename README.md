@@ -27,6 +27,14 @@ machine.
   whole business in one list.
 - **Reports & Ledger** — year-by-year money in/out/net, and a full
   transaction ledger filterable by business line.
+- **Printable receipts** — every payment (a plot installment, or a paid/
+  received entry on agricultural land, a shop, or commercial land) has a
+  **Print** button that opens a formal, letterheaded receipt — logo, receipt
+  number, date, buyer/seller, what was sold, this payment plus total price/
+  paid/remaining — ready to print on any printer connected to the computer
+  via the normal Windows print dialog (Print → pick your printer). No
+  special printer setup or drivers needed beyond installing the printer in
+  Windows itself, the way you would for any other program.
 - **Automatic, scheduled, multi-copy backups** — see **Data Persistence &
   Backups** below for exactly where, how often, how many, and how to
   restore.

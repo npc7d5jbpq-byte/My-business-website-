@@ -172,6 +172,12 @@ async function createWindow() {
   // Any attempt to open a link in a new window (there are none today, but
   // just in case) goes to the OS browser instead of a second app window.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    // Same-origin popups (currently just the receipt print preview) open as
+    // a normal in-app window; anything else (there are no other outbound
+    // links today) goes to the OS browser instead of a second app window.
+    if (serverHandle && url.startsWith(serverHandle.url)) {
+      return { action: 'allow' };
+    }
     shell.openExternal(url);
     return { action: 'deny' };
   });

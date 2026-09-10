@@ -195,6 +195,7 @@
         <td class="text-muted">${escapeHtml(p.notes || '')}</td>
         <td>
           <div class="row-actions">
+            <button type="button" class="btn btn-sm btn-ghost" data-print="${p.id}">🖨 Print</button>
             ${!p.paidDate ? `<button type="button" class="btn btn-sm btn-ghost" data-mark-paid="${p.id}">Mark Paid</button>` : ''}
             <button type="button" class="btn btn-sm btn-danger" data-delete-payment="${p.id}">Delete</button>
           </div>
@@ -274,6 +275,12 @@
         }));
       });
       root.querySelector('[data-open-plan]').addEventListener('click', () => openPlotInstallmentPlanModal(plotId));
+      root.querySelectorAll('[data-print]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const url = `receipt.html?apiBase=/colonies&colonyId=${encodeURIComponent(colonyId)}&plotId=${encodeURIComponent(plotId)}&paymentId=${encodeURIComponent(btn.dataset.print)}`;
+          window.open(url, '_blank');
+        });
+      });
     });
   }
 

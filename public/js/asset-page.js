@@ -150,6 +150,7 @@ function initAssetPage(config) {
           <td class="text-muted">${escapeHtml(p.notes || '')}</td>
           <td>
             <div class="row-actions">
+              <button type="button" class="btn btn-sm btn-ghost" data-print="${p.id}">🖨 Print</button>
               ${!p.paidDate ? `<button type="button" class="btn btn-sm btn-ghost" data-mark-paid="${p.id}">Mark Done</button>` : ''}
               <button type="button" class="btn btn-sm btn-danger" data-delete-payment="${p.id}">Delete</button>
             </div>
@@ -246,6 +247,12 @@ function initAssetPage(config) {
           }));
         });
         root.querySelector('[data-open-plan]').addEventListener('click', () => openInstallmentPlanModal(rowId, row.title));
+        root.querySelectorAll('[data-print]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const url = `receipt.html?apiBase=${encodeURIComponent(config.apiBase)}&entityId=${encodeURIComponent(rowId)}&paymentId=${encodeURIComponent(btn.dataset.print)}`;
+            window.open(url, '_blank');
+          });
+        });
       });
     }
 
