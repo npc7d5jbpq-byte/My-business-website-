@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Plot — Gulberg City Office</title>
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/icon-180.png" />
+<link rel="icon" href="icons/icon-32.png" />
+<meta name="theme-color" content="#0f1a2e" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="GCO" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="main">
+      <header class="topbar" id="topbar"></header>
+      <div class="content">
+        <a class="back-link" href="colonies.html" id="back-link">&larr; Back to Colony</a>
+        <div class="banner" id="page-banner" hidden></div>
+
+        <div class="detail-header">
+          <div>
+            <h1 id="plot-name">Loading…</h1>
+            <div class="meta" id="plot-meta"></div>
+          </div>
+          <div class="row-actions">
+            <button class="btn btn-ghost" id="edit-plot-btn">Edit Plot</button>
+            <button class="btn btn-danger" id="delete-plot-btn">Delete Plot</button>
+          </div>
+        </div>
+
+        <div class="grid grid-4" id="plot-tiles" style="margin-top:20px;"></div>
+
+        <div class="grid grid-2" id="plot-info-cards" style="margin-top:20px;"></div>
+
+        <div class="section-title">
+          <h2>Payments</h2>
+          <div class="row-actions">
+            <button class="btn btn-ghost" id="add-plan-btn">+ Create Installment Plan</button>
+            <button class="btn btn-accent" id="add-payment-btn">+ Add Payment</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th class="text-right">Amount</th>
+                <th>Due date</th>
+                <th>Paid date</th>
+                <th>Paid Through</th>
+                <th>Notes</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="payments-body"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="modal-root"></div>
+  <script src="js/common.js"></script>
+  <script src="js/plot.js"></script>
+</body>
+</html>

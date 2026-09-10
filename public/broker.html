@@ -33,7 +33,23 @@
           </div>
         </div>
 
-        <div class="grid grid-3" id="broker-tiles" style="margin-top:20px;"></div>
+        <div class="grid grid-4" id="broker-tiles" style="margin-top:20px;"></div>
+
+        <div class="section-title">
+          <h2>Advances</h2>
+          <button class="btn btn-ghost" id="add-advance-btn">+ Record Advance</button>
+        </div>
+        <div class="text-muted" style="font-size:12px; margin:-10px 0 14px;">
+          Cash given to this broker on credit, ahead of any specific deal. When a real deal comes
+          in, its commission can be settled by drawing down this balance instead of a fresh
+          payment — see "Offset from Advance" in that deal's Commission screen.
+        </div>
+        <div class="table-wrap" style="margin-bottom:8px;">
+          <table>
+            <thead><tr><th>Date</th><th class="text-right">Amount</th><th>Paid Through</th><th>Notes</th><th></th></tr></thead>
+            <tbody id="advances-body"><tr class="empty-row"><td colspan="5">Loading…</td></tr></tbody>
+          </table>
+        </div>
 
         <div class="section-title">
           <h2>Deals</h2>

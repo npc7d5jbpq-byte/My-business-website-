@@ -126,6 +126,7 @@
       <div class="r-item">
         <div class="r-item-desc">${escapeHtml(payment.notes || (direction === 'paid' ? 'Payment made' : 'Payment received'))}</div>
         <div class="r-item-status">${isPaid ? '[ PAID ]' : `[ PENDING${payment.dueDate ? ' - due ' + formatDate(payment.dueDate) : ''} ]`}</div>
+        ${paymentMethodLabel(payment) ? `<div class="r-item-status" style="font-weight:400;">Paid Through: ${escapeHtml(paymentMethodLabel(payment))}</div>` : ''}
         <div class="r-item-amt">${direction === 'paid' ? '-' : '+'} ${formatCurrency(payment.amount)}</div>
       </div>
       <hr class="r-rule" />

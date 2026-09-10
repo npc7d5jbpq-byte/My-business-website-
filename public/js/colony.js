@@ -99,7 +99,7 @@
         <td class="num">${dueCell}</td>
         <td>
           <div class="row-actions">
-            <button class="btn btn-ghost btn-sm" data-pay="${p.id}">Payments</button>
+            <a class="btn btn-ghost btn-sm" href="plot.html?colonyId=${encodeURIComponent(colonyId)}&plotId=${p.id}">Open</a>
             <button class="btn btn-ghost btn-sm" data-edit-plot="${p.id}">Edit</button>
             <button class="btn btn-danger btn-sm" data-delete-plot="${p.id}">Delete</button>
           </div>
@@ -123,6 +123,8 @@
       { name: 'category', label: 'Category', type: 'select', value: v.category || 'residential', options: [
         { value: 'residential', label: 'Residential' }, { value: 'commercial', label: 'Commercial' }, { value: 'shop', label: 'Shop' },
       ] },
+      { name: 'frontFt', label: 'Front (feet)', type: 'number', step: '0.01', value: v.frontFt != null ? v.frontFt : 0 },
+      { name: 'lengthFt', label: 'Length / Depth (feet)', type: 'number', step: '0.01', value: v.lengthFt != null ? v.lengthFt : 0 },
       { name: 'price', label: 'Sale price (Rs.)', type: 'number', step: '0.01', value: v.price != null ? v.price : 0 },
       { name: 'status', label: 'Status', type: 'select', value: v.status || 'available', options: [
         { value: 'available', label: 'Available' }, { value: 'reserved', label: 'Reserved' }, { value: 'sold', label: 'Sold' },
@@ -159,10 +161,8 @@
   });
 
   document.getElementById('plots-body').addEventListener('click', (e) => {
-    const payBtn = e.target.closest('[data-pay]');
     const editBtn = e.target.closest('[data-edit-plot]');
     const delBtn = e.target.closest('[data-delete-plot]');
-    if (payBtn) openPlotPaymentsModal(payBtn.dataset.pay);
     if (editBtn) {
       const plot = state.colony.plots.find((p) => p.id === editBtn.dataset.editPlot);
       openFormModal({
@@ -186,151 +186,9 @@
     }
   });
 
-  function paymentsModalHtml(plot) {
-    const rows = plot.payments.length ? plot.payments.map((p) => `
-      <tr>
-        <td class="text-right num" style="color:var(--success); font-weight:600;">${formatCurrency(p.amount)}</td>
-        <td>${formatDate(p.dueDate)}</td>
-        <td>${p.paidDate ? formatDate(p.paidDate) : '<span class="badge badge-warning">Pending</span>'}</td>
-        <td class="text-muted">${escapeHtml(p.notes || '')}</td>
-        <td>
-          <div class="row-actions">
-            <button type="button" class="btn btn-sm btn-ghost" data-print="${p.id}">🖨 Print</button>
-            ${!p.paidDate ? `<button type="button" class="btn btn-sm btn-ghost" data-mark-paid="${p.id}">Mark Paid</button>` : ''}
-            <button type="button" class="btn btn-sm btn-danger" data-delete-payment="${p.id}">Delete</button>
-          </div>
-        </td>
-      </tr>
-    `).join('') : '<tr class="empty-row"><td colspan="5">No payments recorded yet.</td></tr>';
-
-    return `
-      <div class="table-wrap" style="margin-bottom:18px;">
-        <table>
-          <thead><tr><th class="text-right">Amount</th><th>Due date</th><th>Paid date</th><th>Notes</th><th></th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-      <div class="modal-actions" style="justify-content:flex-start; margin-bottom:16px;">
-        <button type="button" class="btn btn-accent btn-sm" data-open-plan>+ Create Installment Plan</button>
-      </div>
-      <div style="font-weight:700; font-size:13px; margin-bottom:10px;">Add a Single Payment</div>
-      <form id="add-payment-form">
-        <div class="field-grid">
-          <label class="field"><span>Amount (Rs.)</span><input type="number" step="0.01" name="amount" required /></label>
-          <label class="field"><span>Due date (if promised for later)</span><input type="date" name="dueDate" /></label>
-          <label class="field"><span>Paid date (leave blank if not received yet)</span><input type="date" name="paidDate" /></label>
-          <label class="field field-wide"><span>Notes</span><input type="text" name="notes" placeholder="e.g. 2nd installment" /></label>
-        </div>
-        <div class="modal-error" id="payment-form-error" hidden></div>
-        <div class="modal-actions"><button type="submit" class="btn btn-primary" id="add-payment-submit">Add Payment</button></div>
-      </form>
-    `;
-  }
-
-  function openPlotPaymentsModal(plotId) {
-    const plot = state.colony.plots.find((p) => p.id === plotId);
-    if (!plot) return;
-    openCustomModal(`Payments — Plot ${plot.plotNumber}`, paymentsModalHtml(plot), (root) => {
-      const submitBtn = root.querySelector('#add-payment-submit');
-      root.querySelector('#add-payment-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const form = e.target;
-        const errBox = root.querySelector('#payment-form-error');
-        setButtonLoading(submitBtn, true, 'Adding…');
-        try {
-          await apiRequest(`/plots/${plotId}/payments`, {
-            method: 'POST',
-            body: {
-              amount: form.elements.amount.value,
-              dueDate: form.elements.dueDate.value,
-              paidDate: form.elements.paidDate.value,
-              notes: form.elements.notes.value,
-            },
-          });
-          await load();
-          openPlotPaymentsModal(plotId);
-        } catch (err) {
-          errBox.textContent = err.message;
-          errBox.hidden = false;
-          setButtonLoading(submitBtn, false);
-        }
-      });
-      root.querySelectorAll('[data-mark-paid]').forEach((btn) => {
-        btn.addEventListener('click', withButtonBusy(btn, async () => {
-          try {
-            await apiRequest(`/plot-payments/${btn.dataset.markPaid}`, { method: 'PUT', body: { paidDate: today() } });
-            await load();
-            openPlotPaymentsModal(plotId);
-          } catch (err) { showBanner(err.message); }
-        }));
-      });
-      root.querySelectorAll('[data-delete-payment]').forEach((btn) => {
-        btn.addEventListener('click', withButtonBusy(btn, async () => {
-          if (!confirm('Delete this payment record?')) return;
-          try {
-            await apiRequest(`/plot-payments/${btn.dataset.deletePayment}`, { method: 'DELETE' });
-            await load();
-            openPlotPaymentsModal(plotId);
-          } catch (err) { showBanner(err.message); }
-        }));
-      });
-      root.querySelector('[data-open-plan]').addEventListener('click', () => openPlotInstallmentPlanModal(plotId));
-      root.querySelectorAll('[data-print]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const url = `receipt.html?apiBase=/colonies&colonyId=${encodeURIComponent(colonyId)}&plotId=${encodeURIComponent(plotId)}&paymentId=${encodeURIComponent(btn.dataset.print)}`;
-          window.open(url, '_blank');
-        });
-      });
-    });
-  }
-
-  function openPlotInstallmentPlanModal(plotId) {
-    const plot = state.colony.plots.find((p) => p.id === plotId);
-    if (!plot) return;
-    openCustomModal(`Create Installment Plan — Plot ${plot.plotNumber}`, `<form id="plan-form">${installmentPlanFormHtml({ includeDirection: false })}</form>`, (root) => {
-      initInstallmentPlanRows(root);
-      root.querySelector('[data-plan-cancel]').addEventListener('click', () => openPlotPaymentsModal(plotId));
-      root.querySelector('#plan-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const errBox = root.querySelector('#plan-error');
-        const submitBtn = root.querySelector('[data-plan-submit]');
-        const { upfrontAmount, upfrontDate, installments } = collectInstallmentPlan(root);
-        if (upfrontAmount <= 0 && !installments.length) {
-          errBox.textContent = 'Enter an upfront amount and/or at least one installment.';
-          errBox.hidden = false;
-          return;
-        }
-        const missingDate = installments.find((row) => !row.dueDate);
-        if (missingDate) {
-          errBox.textContent = 'Every installment needs a due date (type months-after, or pick a date directly).';
-          errBox.hidden = false;
-          return;
-        }
-        errBox.hidden = true;
-        setButtonLoading(submitBtn, true, 'Creating…');
-        try {
-          if (upfrontAmount > 0) {
-            await apiRequest(`/plots/${plotId}/payments`, {
-              method: 'POST',
-              body: { amount: upfrontAmount, paidDate: upfrontDate, notes: 'Upfront / Bayana' },
-            });
-          }
-          for (const row of installments) {
-            await apiRequest(`/plots/${plotId}/payments`, {
-              method: 'POST',
-              body: { amount: row.amount, dueDate: row.dueDate, notes: 'Installment' },
-            });
-          }
-          await load();
-          openPlotPaymentsModal(plotId);
-        } catch (err) {
-          errBox.textContent = err.message;
-          errBox.hidden = false;
-          setButtonLoading(submitBtn, false);
-        }
-      });
-    });
-  }
+  // Payments, the installment plan builder, and printing a receipt all now
+  // live on the plot's own dedicated page (plot.html) reached via "Open"
+  // above, instead of a modal here - see plot.js.
 
   // ---- Milestones ----
 

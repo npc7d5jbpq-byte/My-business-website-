@@ -11,7 +11,8 @@
   const state = { broker: null };
   const today = () => new Date().toISOString().slice(0, 10);
 
-  document.getElementById('broker-tiles').innerHTML = skeletonCards(3);
+  document.getElementById('broker-tiles').innerHTML = skeletonCards(4);
+  document.getElementById('advances-body').innerHTML = skeletonRows(2, 5);
   document.getElementById('deals-body').innerHTML = skeletonRows(3, 7);
 
   async function load() {
@@ -29,6 +30,7 @@
     document.getElementById('broker-name').textContent = b.name;
     document.getElementById('broker-phone').textContent = b.phone || 'No phone on file';
     renderTiles(b.stats);
+    renderAdvances(b.advances, b.stats);
     renderDeals(b.deals);
   }
 
@@ -41,11 +43,63 @@
       tile('Total Commission', s.totalCommission, `${s.dealsCount} deal${s.dealsCount === 1 ? '' : 's'}`, '', 0),
       tile('Paid So Far', s.totalPaid, 'Handed over to this broker', 'accent-success', 1),
       tile('Still to be Given', s.totalPending, 'Commission still owed', s.totalPending > 0 ? 'accent-danger' : '', 2),
+      tile('Advance Balance', s.advanceBalance, s.advanceBalance > 0 ? 'Broker owes this back (unearned advance)' : 'Fully settled', s.advanceBalance > 0 ? 'accent-danger' : '', 3),
     ];
     const container = document.getElementById('broker-tiles');
     container.innerHTML = tiles.join('');
     container.querySelectorAll('[data-countup]').forEach((el) => animateCountUp(el, Number(el.dataset.countup), { duration: 650 }));
   }
+
+  // ---- Advances ----
+
+  function renderAdvances(advances, stats) {
+    const body = document.getElementById('advances-body');
+    if (!advances.length) {
+      body.innerHTML = '<tr class="empty-row"><td colspan="5">No advances given yet.</td></tr>';
+      return;
+    }
+    body.innerHTML = advances.map((a) => `
+      <tr>
+        <td>${formatDate(a.date || a.createdAt)}</td>
+        <td class="text-right num" style="font-weight:600;">${formatCurrency(a.amount)}</td>
+        <td class="text-muted" style="font-size:12px;">${escapeHtml(paymentMethodLabel(a)) || '—'}</td>
+        <td class="text-muted">${escapeHtml(a.notes || '')}</td>
+        <td><div class="row-actions"><button type="button" class="btn btn-sm btn-danger" data-delete-advance="${a.id}">Delete</button></div></td>
+      </tr>
+    `).join('');
+    staggerRows(body, { stepMs: 30, maxDelayMs: 200 });
+    body.querySelectorAll('[data-delete-advance]').forEach((btn) => {
+      btn.addEventListener('click', withButtonBusy(btn, async () => {
+        if (!confirm('Delete this advance record? (Only do this if it was entered by mistake — deleting it after it has already been offset against a deal will make the numbers inconsistent.)')) return;
+        try {
+          await apiRequest(`/broker-advances/${btn.dataset.deleteAdvance}`, { method: 'DELETE' });
+          load();
+        } catch (err) { showBanner(err.message); }
+      }));
+    });
+  }
+
+  document.getElementById('add-advance-btn').addEventListener('click', () => {
+    openFormModal({
+      title: 'Record Advance',
+      submitLabel: 'Record Advance',
+      fields: [
+        { name: 'amount', label: 'Amount given (Rs.)', type: 'number', step: '0.01', required: true },
+        { name: 'date', label: 'Date given', type: 'date', value: today() },
+        { name: 'paidThrough', label: 'Paid Through', type: 'select', value: '', options: [
+          { value: '', label: '— Not specified —' }, { value: 'cash', label: 'Cash' },
+          { value: 'pay_order', label: 'Pay Order' }, { value: 'cheque', label: 'Cheque' },
+        ] },
+        { name: 'referenceNumber', label: 'Pay Order / Cheque Number' },
+        { name: 'bankName', label: 'Bank Name' },
+        { name: 'notes', label: 'Notes', type: 'textarea' },
+      ],
+      onSubmit: async (values) => {
+        await apiRequest(`/brokers/${brokerId}/advances`, { method: 'POST', body: values });
+        load();
+      },
+    });
+  });
 
   // ---- Deals ----
 
@@ -147,6 +201,7 @@
         <td class="text-right num" style="color:var(--success); font-weight:600;">${formatCurrency(p.amount)}</td>
         <td>${formatDate(p.dueDate)}</td>
         <td>${p.paidDate ? formatDate(p.paidDate) : '<span class="badge badge-warning">Pending</span>'}</td>
+        <td class="text-muted" style="font-size:12px;">${escapeHtml(paymentMethodLabel(p)) || '—'}</td>
         <td class="text-muted">${escapeHtml(p.notes || '')}</td>
         <td>
           <div class="row-actions">
@@ -156,12 +211,14 @@
           </div>
         </td>
       </tr>
-    `).join('') : '<tr class="empty-row"><td colspan="5">No commission payments recorded yet.</td></tr>';
+    `).join('') : '<tr class="empty-row"><td colspan="6">No commission payments recorded yet.</td></tr>';
+
+    const advanceBalance = state.broker.stats.advanceBalance;
 
     return `
       <div class="table-wrap" style="margin-bottom:18px;">
         <table>
-          <thead><tr><th class="text-right">Amount</th><th>Due date</th><th>Paid date</th><th>Notes</th><th></th></tr></thead>
+          <thead><tr><th class="text-right">Amount</th><th>Due date</th><th>Paid date</th><th>Paid Through</th><th>Notes</th><th></th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>
@@ -174,6 +231,13 @@
           <label class="field"><span>Amount (Rs.)</span><input type="number" step="0.01" name="amount" required /></label>
           <label class="field"><span>Due date (if promised for later)</span><input type="date" name="dueDate" /></label>
           <label class="field"><span>Paid date (leave blank if not paid yet)</span><input type="date" name="paidDate" /></label>
+          <label class="field"><span>Settle Using</span>
+            <select name="source" id="payment-source">
+              <option value="cash">A new payment (cash / pay order / cheque)</option>
+              ${advanceBalance > 0 ? `<option value="advance">Offset from Advance (Rs. ${formatCurrency(advanceBalance).replace('Rs. ', '')} available)</option>` : ''}
+            </select>
+          </label>
+          <div id="payment-method-fields" class="field-grid" style="grid-column:1/-1;">${paymentMethodFieldsHtml()}</div>
           <label class="field field-wide"><span>Notes</span><input type="text" name="notes" placeholder="e.g. 1st installment" /></label>
         </div>
         <div class="modal-error" id="payment-form-error" hidden></div>
@@ -187,6 +251,11 @@
     if (!deal) return;
     openCustomModal(`Commission — ${deal.description}`, paymentsModalHtml(deal), (root) => {
       const submitBtn = root.querySelector('#add-payment-submit');
+      const sourceSelect = root.querySelector('#payment-source');
+      const methodFields = root.querySelector('#payment-method-fields');
+      const toggleMethodFields = () => { methodFields.hidden = sourceSelect.value === 'advance'; };
+      sourceSelect.addEventListener('change', toggleMethodFields);
+      toggleMethodFields();
       root.querySelector('#add-payment-form').addEventListener('submit', async (e) => {
         e.preventDefault();
         const form = e.target;
@@ -199,6 +268,10 @@
               amount: form.elements.amount.value,
               dueDate: form.elements.dueDate.value,
               paidDate: form.elements.paidDate.value,
+              source: form.elements.source.value,
+              paidThrough: form.elements.paidThrough.value,
+              referenceNumber: form.elements.referenceNumber.value,
+              bankName: form.elements.bankName.value,
               notes: form.elements.notes.value,
             },
           });
@@ -211,13 +284,22 @@
         }
       });
       root.querySelectorAll('[data-mark-paid]').forEach((btn) => {
-        btn.addEventListener('click', withButtonBusy(btn, async () => {
-          try {
-            await apiRequest(`/broker-payments/${btn.dataset.markPaid}`, { method: 'PUT', body: { paidDate: today() } });
-            await load();
-            openDealPaymentsModal(dealId);
-          } catch (err) { showBanner(err.message); }
-        }));
+        btn.addEventListener('click', () => {
+          const payment = deal.payments.find((p) => p.id === btn.dataset.markPaid);
+          openSettlePaymentModal({
+            title: 'Mark Commission Paid',
+            defaultDate: (payment && payment.dueDate) || today(),
+            onCancel: () => openDealPaymentsModal(dealId),
+            onConfirm: async ({ paidDate, paidThrough, referenceNumber, bankName }) => {
+              await apiRequest(`/broker-payments/${btn.dataset.markPaid}`, {
+                method: 'PUT',
+                body: { paidDate, paidThrough, referenceNumber, bankName },
+              });
+              await load();
+              openDealPaymentsModal(dealId);
+            },
+          });
+        });
       });
       root.querySelectorAll('[data-delete-payment]').forEach((btn) => {
         btn.addEventListener('click', withButtonBusy(btn, async () => {
@@ -251,7 +333,7 @@
         e.preventDefault();
         const errBox = root.querySelector('#plan-error');
         const submitBtn = root.querySelector('[data-plan-submit]');
-        const { upfrontAmount, upfrontDate, installments } = collectInstallmentPlan(root);
+        const { upfrontAmount, upfrontDate, upfrontPaidThrough, upfrontReferenceNumber, upfrontBankName, installments } = collectInstallmentPlan(root);
         if (upfrontAmount <= 0 && !installments.length) {
           errBox.textContent = 'Enter an upfront amount and/or at least one installment.';
           errBox.hidden = false;
@@ -269,7 +351,10 @@
           if (upfrontAmount > 0) {
             await apiRequest(`/broker-deals/${dealId}/payments`, {
               method: 'POST',
-              body: { amount: upfrontAmount, paidDate: upfrontDate, notes: 'Upfront commission' },
+              body: {
+                amount: upfrontAmount, paidDate: upfrontDate, notes: 'Upfront commission',
+                paidThrough: upfrontPaidThrough, referenceNumber: upfrontReferenceNumber, bankName: upfrontBankName,
+              },
             });
           }
           for (const row of installments) {

@@ -17,11 +17,30 @@ machine.
   plot, record every installment they pay (and what's still owed), plan
   development milestones with target dates, log development expenses, and see
   at a glance how many plots are sold/reserved/available and the colony's
-  profit.
+  profit. Every plot has its **own dedicated page** (open it from the plots
+  table) with its own dimensions, buyer info, and full payment history —
+  completely separate from every other plot, the same way every colony,
+  broker and land/shop/commercial record already gets its own page.
 - **Agricultural Land / Shops / Commercial Land & Plots** — record what was
   bought and from whom, track every payment made to the seller (and what's
   still payable), and — once resold — track every payment received from the
-  buyer (and what's still receivable), plus profit on the sale.
+  buyer (and what's still receivable), plus profit on the sale. Each record
+  also has its own dedicated page (its own tiles, dimensions, and full
+  payment history), reached via **Open** from its list.
+- **Dimensions in feet** — every colony plot and every agricultural/shop/
+  commercial record can record its **Front** and **Length/Depth in feet**,
+  alongside the existing size/area fields.
+- **Payment method on every payment** — every single payment, every
+  installment-plan entry, and every "Mark Paid" action can record how it
+  was actually settled: **Cash**, **Pay Order** (with its number), or
+  **Cheque** (with its number), plus which **bank** it went through. Shown
+  on the payment's row, and on its printed receipt.
+- **Late payments keep their history** — "Mark Paid" never overwrites the
+  originally-promised due date; it only records the *actual* date money
+  changed hands (which the office can set to any date, not just today) and
+  how it was paid. So if a payment was due on the 22nd but only came in on
+  the 27th, both dates stay on record — nothing has to be deleted and
+  re-added to reflect what really happened.
 - **Brokers Commission** — every broker gets their own page listing every
   deal they earned a commission on separately, each with its own commission
   amount and its own payment schedule (a broker is very often paid their
@@ -31,6 +50,13 @@ machine.
   shows their total commission across every deal, how much has actually
   been handed to them, and how much is still owed — and it feeds into the
   Dashboard and Reports/Ledger the same way every other module does.
+  A broker can also be given an **advance** — cash on credit, ahead of any
+  specific deal — and later, a deal's commission can be settled partly or
+  fully by drawing down that advance instead of a fresh payment (pick
+  "Offset from Advance" when settling). The broker's page always shows the
+  outstanding advance balance — how much of it they still haven't earned
+  back through commission, i.e. what they'd owe the office if no more deals
+  came in.
 - **Dashboard** — total money in, total money out, total receivable, total
   payable, net profit, every upcoming or overdue payment/task across the
   whole business (including broker commissions) in one list, and a
@@ -256,6 +282,8 @@ src/routes/dashboard.js  Cross-module totals, upcoming dues, yearly/monthly summ
 src/routes/backups.js    Backup list/create/restore API
 src/routes/account.js    Change username/password API
 public/                  Frontend (plain HTML/CSS/JS, no build step required)
+public/plot.html         A single colony plot's own dedicated page (dimensions, payments)
+public/asset-detail.html A single agricultural/shop/commercial record's own dedicated page
 public/backups.html      Backups & Restore page
 public/account.html      Account Settings (change username/password) page
 .github/workflows/       CI workflow that builds the Windows/macOS/Linux installers

@@ -134,13 +134,15 @@ router.delete('/colonies/:id', (req, res) => {
 router.post('/colonies/:id/plots', (req, res) => {
   const colony = db.get('colonies', req.params.id);
   if (!colony) return res.status(404).json({ error: 'Colony not found.' });
-  const { plotNumber, size, category, price, status, buyerName, buyerPhone, buyerCnic, saleDate, notes } = req.body;
+  const { plotNumber, size, category, frontFt, lengthFt, price, status, buyerName, buyerPhone, buyerCnic, saleDate, notes } = req.body;
   if (!plotNumber || !String(plotNumber).trim()) return res.status(400).json({ error: 'Plot number is required.' });
   const plot = db.insert('plots', {
     colonyId: colony.id,
     plotNumber: String(plotNumber).trim(),
     size: size || '',
     category: category || 'residential',
+    frontFt: Number(frontFt) || 0,
+    lengthFt: Number(lengthFt) || 0,
     price: Number(price) || 0,
     status: status || 'available',
     buyerName: buyerName || '',
@@ -155,10 +157,11 @@ router.post('/colonies/:id/plots', (req, res) => {
 router.put('/plots/:id', (req, res) => {
   const plot = db.get('plots', req.params.id);
   if (!plot) return res.status(404).json({ error: 'Plot not found.' });
-  const fields = ['plotNumber', 'size', 'category', 'price', 'status', 'buyerName', 'buyerPhone', 'buyerCnic', 'saleDate', 'notes'];
+  const fields = ['plotNumber', 'size', 'category', 'frontFt', 'lengthFt', 'price', 'status', 'buyerName', 'buyerPhone', 'buyerCnic', 'saleDate', 'notes'];
+  const numeric = new Set(['price', 'frontFt', 'lengthFt']);
   const patch = {};
   for (const f of fields) {
-    if (req.body[f] !== undefined) patch[f] = f === 'price' ? Number(req.body[f]) || 0 : req.body[f];
+    if (req.body[f] !== undefined) patch[f] = numeric.has(f) ? Number(req.body[f]) || 0 : req.body[f];
   }
   res.json(db.update('plots', req.params.id, patch));
 });
@@ -174,13 +177,16 @@ router.delete('/plots/:id', (req, res) => {
 router.post('/plots/:id/payments', (req, res) => {
   const plot = db.get('plots', req.params.id);
   if (!plot) return res.status(404).json({ error: 'Plot not found.' });
-  const { amount, dueDate, paidDate, notes } = req.body;
+  const { amount, dueDate, paidDate, paidThrough, referenceNumber, bankName, notes } = req.body;
   if (!amount || Number(amount) <= 0) return res.status(400).json({ error: 'A positive amount is required.' });
   const payment = db.insert('plotPayments', {
     parentId: plot.id,
     amount: Number(amount),
     dueDate: dueDate || '',
     paidDate: paidDate || '',
+    paidThrough: paidThrough || '',
+    referenceNumber: referenceNumber || '',
+    bankName: bankName || '',
     notes: notes || '',
   });
   res.status(201).json(payment);
@@ -190,7 +196,7 @@ router.put('/plot-payments/:id', (req, res) => {
   const row = db.get('plotPayments', req.params.id);
   if (!row) return res.status(404).json({ error: 'Payment not found.' });
   const patch = {};
-  for (const f of ['amount', 'dueDate', 'paidDate', 'notes']) {
+  for (const f of ['amount', 'dueDate', 'paidDate', 'paidThrough', 'referenceNumber', 'bankName', 'notes']) {
     if (req.body[f] !== undefined) patch[f] = f === 'amount' ? Number(req.body[f]) || 0 : req.body[f];
   }
   res.json(db.update('plotPayments', req.params.id, patch));

@@ -48,12 +48,14 @@ function createAssetRouter({ collection, paymentsCollection, entityLabel }) {
   });
 
   router.post('/', (req, res) => {
-    const { title, location, area, purchasePrice, purchaseDate, sellerName, sellerPhone, notes } = req.body;
+    const { title, location, area, frontFt, lengthFt, purchasePrice, purchaseDate, sellerName, sellerPhone, notes } = req.body;
     if (!title || !String(title).trim()) return res.status(400).json({ error: `${entityLabel} title/name is required.` });
     const entity = db.insert(collection, {
       title: String(title).trim(),
       location: location || '',
       area: area || '',
+      frontFt: Number(frontFt) || 0,
+      lengthFt: Number(lengthFt) || 0,
       purchasePrice: Number(purchasePrice) || 0,
       purchaseDate: purchaseDate || '',
       sellerName: sellerName || '',
@@ -81,10 +83,10 @@ function createAssetRouter({ collection, paymentsCollection, entityLabel }) {
     const entity = db.get(collection, req.params.id);
     if (!entity) return res.status(404).json({ error: `${entityLabel} not found.` });
     const fields = [
-      'title', 'location', 'area', 'purchasePrice', 'purchaseDate', 'sellerName', 'sellerPhone',
+      'title', 'location', 'area', 'frontFt', 'lengthFt', 'purchasePrice', 'purchaseDate', 'sellerName', 'sellerPhone',
       'status', 'salePrice', 'saleDate', 'buyerName', 'buyerPhone', 'notes',
     ];
-    const numeric = new Set(['purchasePrice', 'salePrice']);
+    const numeric = new Set(['purchasePrice', 'salePrice', 'frontFt', 'lengthFt']);
     const patch = {};
     for (const f of fields) {
       if (req.body[f] !== undefined) patch[f] = numeric.has(f) ? Number(req.body[f]) || 0 : req.body[f];
@@ -103,7 +105,7 @@ function createAssetRouter({ collection, paymentsCollection, entityLabel }) {
   router.post('/:id/payments', (req, res) => {
     const entity = db.get(collection, req.params.id);
     if (!entity) return res.status(404).json({ error: `${entityLabel} not found.` });
-    const { direction, amount, dueDate, paidDate, notes } = req.body;
+    const { direction, amount, dueDate, paidDate, paidThrough, referenceNumber, bankName, notes } = req.body;
     if (!amount || Number(amount) <= 0) return res.status(400).json({ error: 'A positive amount is required.' });
     if (direction !== 'paid' && direction !== 'received') {
       return res.status(400).json({ error: "direction must be 'paid' or 'received'." });
@@ -114,6 +116,9 @@ function createAssetRouter({ collection, paymentsCollection, entityLabel }) {
       amount: Number(amount),
       dueDate: dueDate || '',
       paidDate: paidDate || '',
+      paidThrough: paidThrough || '',
+      referenceNumber: referenceNumber || '',
+      bankName: bankName || '',
       notes: notes || '',
     });
     res.status(201).json(payment);
@@ -123,7 +128,7 @@ function createAssetRouter({ collection, paymentsCollection, entityLabel }) {
     const row = db.get(paymentsCollection, req.params.paymentId);
     if (!row) return res.status(404).json({ error: 'Payment not found.' });
     const patch = {};
-    for (const f of ['direction', 'amount', 'dueDate', 'paidDate', 'notes']) {
+    for (const f of ['direction', 'amount', 'dueDate', 'paidDate', 'paidThrough', 'referenceNumber', 'bankName', 'notes']) {
       if (req.body[f] !== undefined) patch[f] = f === 'amount' ? Number(req.body[f]) || 0 : req.body[f];
     }
     res.json(db.update(paymentsCollection, req.params.paymentId, patch));

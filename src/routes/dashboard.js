@@ -87,11 +87,17 @@ function brokerModuleTotals() {
   let totalCommission = 0;
   let totalPaid = 0;
   let totalPending = 0;
+  let cashOut = 0;
+  let totalAdvanceGiven = 0;
+  let advanceBalance = 0;
   for (const broker of brokers) {
     const stats = computeBrokerStats(broker);
     totalCommission += stats.totalCommission;
     totalPaid += stats.totalPaid;
     totalPending += stats.totalPending;
+    cashOut += stats.cashOut;
+    totalAdvanceGiven += stats.totalAdvanceGiven;
+    advanceBalance += stats.advanceBalance;
   }
   return {
     label: 'Brokers Commission',
@@ -99,6 +105,13 @@ function brokerModuleTotals() {
     totalCommission: round2(totalCommission),
     totalPaid: round2(totalPaid),
     totalPending: round2(totalPending),
+    // Real cash that left the business through brokers (commission paid in
+    // cash/cheque/pay order, plus every advance given) - used for the
+    // dashboard's cash-flow totals below. Deliberately NOT the same as
+    // totalPaid, which also includes advance *offsets* (no new cash then).
+    cashOut: round2(cashOut),
+    totalAdvanceGiven: round2(totalAdvanceGiven),
+    advanceBalance: round2(advanceBalance),
   };
 }
 
@@ -114,7 +127,7 @@ router.get('/dashboard', (req, res) => {
     colonySummary.totalExpensesPaid +
       colonySummary.acquisitionCost +
       assetSummaries.reduce((s, m) => s + m.totalPaid, 0) +
-      brokerSummary.totalPaid
+      brokerSummary.cashOut
   );
   const totalReceivable = round2(
     colonySummary.totalReceivable + assetSummaries.reduce((s, m) => s + m.totalReceivable, 0)
@@ -243,8 +256,16 @@ function collectMoneyFlows() {
       flows.push({ date: row.paidDate, amount: Number(row.amount) || 0, direction: row.direction === 'received' ? 'in' : 'out' });
     }
   }
+  // Advance-offset commission payments (source: 'advance') don't move new
+  // cash - the cash already left the business when the advance itself was
+  // given, counted below - so only real cash/cheque/pay-order settlements
+  // count here.
   for (const row of settledRows(db.list('brokerCommissionPayments'))) {
+    if (row.source === 'advance') continue;
     flows.push({ date: row.paidDate, amount: Number(row.amount) || 0, direction: 'out' });
+  }
+  for (const row of db.list('brokerAdvances')) {
+    flows.push({ date: row.date || row.createdAt, amount: Number(row.amount) || 0, direction: 'out' });
   }
   return flows;
 }
@@ -430,7 +451,11 @@ router.get('/dashboard/ledger', (req, res) => {
     const deals = db.list('brokerDeals', (d) => d.brokerId === broker.id);
     const dealById = new Map(deals.map((d) => [d.id, d]));
     const dealIds = new Set(deals.map((d) => d.id));
+    // Advance-offset settlements don't move new cash (see collectMoneyFlows
+    // above), so they're left out of this cash ledger - the advance itself,
+    // below, is the entry that represents that money actually leaving.
     for (const row of settledRows(db.list('brokerCommissionPayments', (p) => dealIds.has(p.parentId)))) {
+      if (row.source === 'advance') continue;
       const deal = dealById.get(row.parentId);
       entries.push({
         date: row.paidDate,
@@ -439,6 +464,16 @@ router.get('/dashboard/ledger', (req, res) => {
         direction: 'out',
         amount: row.amount,
         notes: row.notes,
+      });
+    }
+    for (const advance of db.list('brokerAdvances', (a) => a.brokerId === broker.id)) {
+      entries.push({
+        date: advance.date || advance.createdAt,
+        module: 'Brokers Commission',
+        context: `${broker.name} - Advance given`,
+        direction: 'out',
+        amount: advance.amount,
+        notes: advance.notes,
       });
     }
   }

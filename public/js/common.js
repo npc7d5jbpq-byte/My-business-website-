@@ -381,6 +381,95 @@ function withButtonBusy(button, fn) {
 // due date or a quick "due after N months" that fills the date in for you),
 // instead of adding each payment one at a time and hand-calculating dates.
 
+// ---- Payment method (paid through / reference no. / bank) ----
+// Shared by every "add a payment" form and the Mark Paid / installment-plan
+// upfront section across colonies, agricultural/shops/commercial, and
+// broker commissions - so the client can record whether a payment moved as
+// cash, a pay order (and its number), or a cheque (and its number), plus
+// which bank it went through.
+
+const PAID_THROUGH_OPTIONS = [
+  { value: '', label: '— Not specified —' },
+  { value: 'cash', label: 'Cash' },
+  { value: 'pay_order', label: 'Pay Order' },
+  { value: 'cheque', label: 'Cheque' },
+];
+
+function paymentMethodFieldsHtml() {
+  return `
+    <label class="field"><span>Paid Through</span>
+      <select name="paidThrough">
+        ${PAID_THROUGH_OPTIONS.map((o) => `<option value="${o.value}">${o.label}</option>`).join('')}
+      </select>
+    </label>
+    <label class="field"><span>Pay Order / Cheque Number</span><input type="text" name="referenceNumber" placeholder="if applicable" /></label>
+    <label class="field"><span>Bank Name</span><input type="text" name="bankName" placeholder="if applicable" /></label>
+  `;
+}
+
+// A short display label for a payment row's method, e.g. "Pay Order #1234
+// · HBL Bank" - empty string if nothing was recorded.
+function paymentMethodLabel(p) {
+  if (!p) return '';
+  if (p.source === 'advance') return 'Offset from broker advance';
+  const map = { cash: 'Cash', pay_order: 'Pay Order', cheque: 'Cheque' };
+  const label = map[p.paidThrough];
+  if (!label) return '';
+  const bits = [label];
+  if (p.referenceNumber) bits.push(`#${p.referenceNumber}`);
+  if (p.bankName) bits.push(p.bankName);
+  return bits.join(' · ');
+}
+
+// Opens a small modal to record how/when a pending payment was actually
+// settled. The point: the due date stays exactly as originally promised
+// (never overwritten), and this only ever sets the *actual* date money
+// changed hands - which is very often later than the due date - plus how
+// it was paid. That way the record shows both: what was promised, and what
+// actually happened, instead of losing the original date the moment a
+// late payment is marked paid.
+function openSettlePaymentModal({ title = 'Mark as Paid', defaultDate, includeMethod = true, onConfirm, onCancel }) {
+  const dateVal = defaultDate || new Date().toISOString().slice(0, 10);
+  openCustomModal(title, `
+    <form id="settle-payment-form">
+      <p class="text-muted" style="margin:0 0 14px; font-size:12.5px; line-height:1.6;">
+        The due date stays on record as originally promised — this only sets the date the money
+        actually changed hands, even if that's later (or earlier) than that.
+      </p>
+      <div class="field-grid">
+        <label class="field"><span>Actual paid date</span><input type="date" name="paidDate" value="${dateVal}" required /></label>
+        ${includeMethod ? paymentMethodFieldsHtml() : ''}
+      </div>
+      <div class="modal-error" id="settle-payment-error" hidden style="margin-top:14px;"></div>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button type="button" class="btn btn-ghost" data-settle-cancel>Cancel</button>
+        <button type="submit" class="btn btn-primary" id="settle-payment-submit">Confirm Paid</button>
+      </div>
+    </form>
+  `, (root) => {
+    root.querySelector('[data-settle-cancel]').addEventListener('click', () => { if (onCancel) onCancel(); });
+    root.querySelector('#settle-payment-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const errBox = root.querySelector('#settle-payment-error');
+      const btn = root.querySelector('#settle-payment-submit');
+      setButtonLoading(btn, true, 'Saving…');
+      try {
+        await onConfirm({
+          paidDate: form.elements.paidDate.value,
+          paidThrough: includeMethod ? form.elements.paidThrough.value : undefined,
+          referenceNumber: includeMethod ? form.elements.referenceNumber.value : undefined,
+          bankName: includeMethod ? form.elements.bankName.value : undefined,
+        });
+      } catch (err) {
+        errBox.textContent = err.message || 'Something went wrong.';
+        errBox.hidden = false;
+        setButtonLoading(btn, false);
+      }
+    });
+  });
+}
+
 function addMonthsToDate(dateStr, months) {
   const base = dateStr ? new Date(dateStr) : new Date();
   if (Number.isNaN(base.getTime())) return '';
@@ -423,6 +512,7 @@ function installmentPlanFormHtml({ includeDirection = false, unit = 'months' } =
     <div class="field-grid" style="margin-bottom:6px;">
       <label class="field"><span>Upfront / Bayana amount (Rs.)</span><input type="number" step="0.01" name="planUpfrontAmount" placeholder="e.g. 20" /></label>
       <label class="field"><span>Upfront / Bayana date</span><input type="date" name="planUpfrontDate" value="${today}" /></label>
+      ${paymentMethodFieldsHtml()}
     </div>
     <div style="margin:16px 0 8px; font-weight:700; font-size:13px;">Installments</div>
     <div data-installment-rows></div>
@@ -481,11 +571,14 @@ function initInstallmentPlanRows(root, unit = 'months') {
 function collectInstallmentPlan(root) {
   const upfrontAmount = Number(root.querySelector('[name=planUpfrontAmount]').value) || 0;
   const upfrontDate = root.querySelector('[name=planUpfrontDate]').value;
+  const upfrontPaidThrough = root.querySelector('[name=paidThrough]') ? root.querySelector('[name=paidThrough]').value : '';
+  const upfrontReferenceNumber = root.querySelector('[name=referenceNumber]') ? root.querySelector('[name=referenceNumber]').value : '';
+  const upfrontBankName = root.querySelector('[name=bankName]') ? root.querySelector('[name=bankName]').value : '';
   const installments = Array.from(root.querySelectorAll('[data-installment-row]'))
     .map((rowEl) => ({
       amount: Number(rowEl.querySelector('.inst-amount').value) || 0,
       dueDate: rowEl.querySelector('.inst-duedate').value,
     }))
     .filter((row) => row.amount > 0);
-  return { upfrontAmount, upfrontDate, installments };
+  return { upfrontAmount, upfrontDate, upfrontPaidThrough, upfrontReferenceNumber, upfrontBankName, installments };
 }
