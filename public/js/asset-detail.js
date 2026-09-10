@@ -101,29 +101,38 @@
       return;
     }
     const sorted = payments.slice().sort((a, b) => new Date(b.dueDate || b.paidDate || 0) - new Date(a.dueDate || a.paidDate || 0));
-    body.innerHTML = sorted.map((p) => `
-      <tr>
+    body.innerHTML = sorted.map((p) => {
+      const rescheduled = p.status === 'rescheduled';
+      const settledCell = rescheduled
+        ? '<span class="badge badge-muted">Missed — Rescheduled</span>'
+        : (p.paidDate ? formatDate(p.paidDate) : '<span class="badge badge-warning">Pending</span>');
+      const methodLine = [paymentMethodLabel(p), paidByLabel(p)].filter(Boolean).join('<br>');
+      return `
+      <tr style="${rescheduled ? 'opacity:0.65;' : ''}">
         <td>${p.direction === 'paid' ? `<span class="badge badge-danger">Paid to seller</span>` : `<span class="badge badge-success">Received from buyer</span>`}</td>
         <td class="text-right num" style="font-weight:600; color:${p.direction === 'paid' ? 'var(--danger)' : 'var(--success)'};">${formatCurrency(p.amount)}</td>
         <td>${formatDate(p.dueDate)}</td>
-        <td>${p.paidDate ? formatDate(p.paidDate) : '<span class="badge badge-warning">Pending</span>'}</td>
-        <td class="text-muted" style="font-size:12px;">${escapeHtml(paymentMethodLabel(p)) || '—'}</td>
+        <td>${settledCell}</td>
+        <td class="text-muted" style="font-size:12px;">${methodLine || '—'}</td>
         <td class="text-muted">${escapeHtml(p.notes || '')}</td>
         <td>
           <div class="row-actions">
             <button type="button" class="btn btn-sm btn-ghost" data-print="${p.id}">🖨 Print</button>
-            ${!p.paidDate ? `<button type="button" class="btn btn-sm btn-ghost" data-mark-paid="${p.id}">Mark Done</button>` : ''}
+            ${!p.paidDate && !rescheduled ? `<button type="button" class="btn btn-sm btn-ghost" data-mark-paid="${p.id}">Mark Done</button>` : ''}
+            ${!p.paidDate && !rescheduled ? `<button type="button" class="btn btn-sm btn-ghost" data-reschedule="${p.id}" title="Wasn't given/received on time — set a new date">Reschedule</button>` : ''}
             <button type="button" class="btn btn-sm btn-danger" data-delete-payment="${p.id}">Delete</button>
           </div>
         </td>
       </tr>
-    `).join('');
+    `;
+    }).join('');
     staggerRows(body, { stepMs: 30, maxDelayMs: 240 });
   }
 
   document.getElementById('payments-body').addEventListener('click', (e) => {
     const printBtn = e.target.closest('[data-print]');
     const markBtn = e.target.closest('[data-mark-paid]');
+    const rescheduleBtn = e.target.closest('[data-reschedule]');
     const delBtn = e.target.closest('[data-delete-payment]');
     if (printBtn) {
       const url = `receipt.html?apiBase=${encodeURIComponent(config.apiBase)}&entityId=${encodeURIComponent(id)}&paymentId=${encodeURIComponent(printBtn.dataset.print)}`;
@@ -135,10 +144,30 @@
         title: 'Mark Payment Settled',
         defaultDate: (payment && payment.dueDate) || today(),
         onCancel: load,
-        onConfirm: async ({ paidDate, paidThrough, referenceNumber, bankName }) => {
+        onConfirm: async ({ paidDate, paidThrough, referenceNumber, bankName, paidBy }) => {
           await apiRequest(`${config.apiBase}/payments/${markBtn.dataset.markPaid}`, {
             method: 'PUT',
-            body: { paidDate, paidThrough, referenceNumber, bankName },
+            body: { paidDate, paidThrough, referenceNumber, bankName, paidBy },
+          });
+          closeModal();
+          await load();
+        },
+      });
+    }
+    if (rescheduleBtn) {
+      const payment = (state.entity.payments || []).find((p) => p.id === rescheduleBtn.dataset.reschedule);
+      openRescheduleModal({
+        title: 'Reschedule Payment',
+        originalDueDate: payment && payment.dueDate,
+        onCancel: load,
+        onConfirm: async ({ newDueDate, reason }) => {
+          await apiRequest(`${config.apiBase}/payments/${rescheduleBtn.dataset.reschedule}`, {
+            method: 'PUT',
+            body: { status: 'rescheduled', notes: `${payment.notes ? payment.notes + ' — ' : ''}Missed, rescheduled to ${formatDate(newDueDate)}${reason ? ' (' + reason + ')' : ''}` },
+          });
+          await apiRequest(`${config.apiBase}/${id}/payments`, {
+            method: 'POST',
+            body: { direction: payment.direction, amount: payment.amount, dueDate: newDueDate, notes: `Rescheduled from ${formatDate(payment.dueDate)}${reason ? ' — ' + reason : ''}` },
           });
           closeModal();
           await load();
@@ -194,6 +223,7 @@
               paidThrough: form.elements.paidThrough.value,
               referenceNumber: form.elements.referenceNumber.value,
               bankName: form.elements.bankName.value,
+              paidBy: form.elements.paidBy.value,
               notes: form.elements.notes.value,
             },
           });
@@ -217,7 +247,7 @@
         const errBox = root.querySelector('#plan-error');
         const submitBtn = root.querySelector('[data-plan-submit]');
         const direction = root.querySelector('[name=planDirection]').value;
-        const { upfrontAmount, upfrontDate, upfrontPaidThrough, upfrontReferenceNumber, upfrontBankName, installments } = collectInstallmentPlan(root);
+        const { upfrontAmount, upfrontDate, upfrontPaidThrough, upfrontReferenceNumber, upfrontBankName, upfrontPaidBy, installments } = collectInstallmentPlan(root);
         if (upfrontAmount <= 0 && !installments.length) {
           errBox.textContent = 'Enter an upfront amount and/or at least one installment.';
           errBox.hidden = false;
@@ -237,7 +267,7 @@
               method: 'POST',
               body: {
                 direction, amount: upfrontAmount, paidDate: upfrontDate, notes: 'Upfront / Bayana',
-                paidThrough: upfrontPaidThrough, referenceNumber: upfrontReferenceNumber, bankName: upfrontBankName,
+                paidThrough: upfrontPaidThrough, referenceNumber: upfrontReferenceNumber, bankName: upfrontBankName, paidBy: upfrontPaidBy,
               },
             });
           }

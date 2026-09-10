@@ -42,11 +42,19 @@ function computeBrokerStats(broker) {
   let cashCommissionPaid = 0;
   let advanceUsed = 0;
   for (const deal of deals) {
+    const cancelled = deal.status === 'cancelled';
     const payments = db.list('brokerCommissionPayments', (p) => p.parentId === deal.id);
     const stats = computeDealStats(deal, payments);
-    totalCommission += stats.commissionAmount;
+    // A cancelled deal's commission is void - it no longer counts as a
+    // committed liability (totalCommission) or as still owed (totalPending).
+    // Whatever was *already* paid on it before cancellation is real cash
+    // that already left the business, though, so that stays counted below
+    // exactly like any other settled payment - cancelling doesn't undo it.
+    if (!cancelled) {
+      totalCommission += stats.commissionAmount;
+      totalPending += stats.remaining;
+    }
     totalPaid += stats.totalPaid;
-    totalPending += stats.remaining;
     for (const p of settledRows(payments)) {
       if (p.source === 'advance') advanceUsed += Number(p.amount) || 0;
       else cashCommissionPaid += Number(p.amount) || 0;
@@ -140,7 +148,7 @@ router.delete('/brokers/:id', (req, res) => {
 router.post('/brokers/:id/advances', (req, res) => {
   const broker = db.get('brokers', req.params.id);
   if (!broker) return res.status(404).json({ error: 'Broker not found.' });
-  const { amount, date, paidThrough, referenceNumber, bankName, notes } = req.body;
+  const { amount, date, paidThrough, referenceNumber, bankName, paidBy, notes } = req.body;
   if (!amount || Number(amount) <= 0) return res.status(400).json({ error: 'A positive amount is required.' });
   const advance = db.insert('brokerAdvances', {
     brokerId: broker.id,
@@ -149,6 +157,7 @@ router.post('/brokers/:id/advances', (req, res) => {
     paidThrough: paidThrough || '',
     referenceNumber: referenceNumber || '',
     bankName: bankName || '',
+    paidBy: paidBy || '',
     notes: notes || '',
   });
   res.status(201).json(advance);
@@ -173,6 +182,8 @@ router.post('/brokers/:id/deals', (req, res) => {
     dealValue: Number(dealValue) || 0,
     commissionAmount: Number(commissionAmount),
     dealDate: dealDate || '',
+    status: 'active',
+    cancelReason: '',
     notes: notes || '',
   });
   res.status(201).json(deal);
@@ -181,7 +192,7 @@ router.post('/brokers/:id/deals', (req, res) => {
 router.put('/broker-deals/:id', (req, res) => {
   const deal = db.get('brokerDeals', req.params.id);
   if (!deal) return res.status(404).json({ error: 'Deal not found.' });
-  const fields = ['description', 'dealValue', 'commissionAmount', 'dealDate', 'notes'];
+  const fields = ['description', 'dealValue', 'commissionAmount', 'dealDate', 'status', 'cancelReason', 'notes'];
   const numeric = new Set(['dealValue', 'commissionAmount']);
   const patch = {};
   for (const f of fields) {
@@ -207,7 +218,7 @@ function findBrokerForDeal(deal) {
 router.post('/broker-deals/:id/payments', (req, res) => {
   const deal = db.get('brokerDeals', req.params.id);
   if (!deal) return res.status(404).json({ error: 'Deal not found.' });
-  const { amount, dueDate, paidDate, source, paidThrough, referenceNumber, bankName, notes } = req.body;
+  const { amount, dueDate, paidDate, source, paidThrough, referenceNumber, bankName, paidBy, notes } = req.body;
   if (!amount || Number(amount) <= 0) return res.status(400).json({ error: 'A positive amount is required.' });
 
   const useAdvance = source === 'advance';
@@ -230,6 +241,8 @@ router.post('/broker-deals/:id/payments', (req, res) => {
     paidThrough: useAdvance ? '' : (paidThrough || ''),
     referenceNumber: useAdvance ? '' : (referenceNumber || ''),
     bankName: useAdvance ? '' : (bankName || ''),
+    paidBy: paidBy || '',
+    status: '',
     notes: notes || '',
   });
   res.status(201).json(payment);
@@ -239,7 +252,7 @@ router.put('/broker-payments/:id', (req, res) => {
   const row = db.get('brokerCommissionPayments', req.params.id);
   if (!row) return res.status(404).json({ error: 'Payment not found.' });
   const patch = {};
-  for (const f of ['amount', 'dueDate', 'paidDate', 'source', 'paidThrough', 'referenceNumber', 'bankName', 'notes']) {
+  for (const f of ['amount', 'dueDate', 'paidDate', 'source', 'paidThrough', 'referenceNumber', 'bankName', 'paidBy', 'status', 'notes']) {
     if (req.body[f] !== undefined) patch[f] = f === 'amount' ? Number(req.body[f]) || 0 : req.body[f];
   }
   res.json(db.update('brokerCommissionPayments', req.params.id, patch));

@@ -68,7 +68,7 @@
   // The earliest payment that's promised but not yet paid - the plot's
   // "next payment schedule" entry, shown right in the plots table.
   function nextDueOf(payments) {
-    const pending = (payments || []).filter((p) => !p.paidDate && p.dueDate);
+    const pending = (payments || []).filter((p) => !p.paidDate && p.dueDate && p.status !== 'rescheduled');
     if (!pending.length) return null;
     pending.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
     const next = pending[0];

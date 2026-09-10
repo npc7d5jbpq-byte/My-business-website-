@@ -217,7 +217,9 @@ router.get('/dashboard/upcoming', (req, res) => {
   }
 
   for (const broker of db.list('brokers')) {
-    const deals = db.list('brokerDeals', (d) => d.brokerId === broker.id);
+    // A cancelled deal's commission is void, so its still-pending
+    // installments shouldn't show up as something still needing to be paid.
+    const deals = db.list('brokerDeals', (d) => d.brokerId === broker.id && d.status !== 'cancelled');
     const dealById = new Map(deals.map((d) => [d.id, d]));
     const dealIds = new Set(deals.map((d) => d.id));
     for (const row of pendingRows(db.list('brokerCommissionPayments', (p) => dealIds.has(p.parentId)))) {

@@ -33,14 +33,24 @@ machine.
 - **Payment method on every payment** — every single payment, every
   installment-plan entry, and every "Mark Paid" action can record how it
   was actually settled: **Cash**, **Pay Order** (with its number), or
-  **Cheque** (with its number), plus which **bank** it went through. Shown
-  on the payment's row, and on its printed receipt.
+  **Cheque** (with its number), which **bank** it went through, and **Paid
+  By** — who actually handed over or received the money, when that's
+  someone other than the buyer/seller/broker on record (a relative, a
+  partner settling on someone's behalf, etc.). Shown on the payment's row,
+  and on its printed receipt.
 - **Late payments keep their history** — "Mark Paid" never overwrites the
   originally-promised due date; it only records the *actual* date money
   changed hands (which the office can set to any date, not just today) and
   how it was paid. So if a payment was due on the 22nd but only came in on
   the 27th, both dates stay on record — nothing has to be deleted and
   re-added to reflect what really happened.
+- **Missed payments can be rescheduled without losing history** — if a
+  payment wasn't given or received at all on its due date, **Reschedule**
+  (next to Mark Paid on any pending installment) asks for the new expected
+  date and keeps the original installment on record, clearly marked
+  "Missed — Rescheduled", while a fresh pending installment is created for
+  the new date. Nothing is deleted or silently overwritten — the missed
+  promise and the new one both stay visible.
 - **Brokers Commission** — every broker gets their own page listing every
   deal they earned a commission on separately, each with its own commission
   amount and its own payment schedule (a broker is very often paid their
@@ -56,7 +66,11 @@ machine.
   "Offset from Advance" when settling). The broker's page always shows the
   outstanding advance balance — how much of it they still haven't earned
   back through commission, i.e. what they'd owe the office if no more deals
-  came in.
+  came in. A deal that falls through can be **Cancelled** (voids its
+  commission — it stops counting as owed — while keeping the deal itself,
+  its reason, and any commission already paid on record) rather than
+  **Deleted** (which erases it entirely); a cancelled deal can be
+  reactivated again if that was a mistake.
 - **Dashboard** — total money in, total money out, total receivable, total
   payable, net profit, every upcoming or overdue payment/task across the
   whole business (including broker commissions) in one list, and a

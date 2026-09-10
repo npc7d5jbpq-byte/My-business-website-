@@ -404,6 +404,7 @@ function paymentMethodFieldsHtml() {
     </label>
     <label class="field"><span>Pay Order / Cheque Number</span><input type="text" name="referenceNumber" placeholder="if applicable" /></label>
     <label class="field"><span>Bank Name</span><input type="text" name="bankName" placeholder="if applicable" /></label>
+    <label class="field"><span>Paid By</span><input type="text" name="paidBy" placeholder="if different from the person on record - e.g. a relative paid on their behalf" /></label>
   `;
 }
 
@@ -419,6 +420,14 @@ function paymentMethodLabel(p) {
   if (p.referenceNumber) bits.push(`#${p.referenceNumber}`);
   if (p.bankName) bits.push(p.bankName);
   return bits.join(' · ');
+}
+
+// Who actually handed over/received the money, if different from the
+// buyer/seller/broker the payment is filed under (e.g. a relative or
+// business partner settling on someone else's behalf) - empty string if
+// not recorded.
+function paidByLabel(p) {
+  return p && p.paidBy ? `Paid by ${p.paidBy}` : '';
 }
 
 // Opens a small modal to record how/when a pending payment was actually
@@ -460,7 +469,54 @@ function openSettlePaymentModal({ title = 'Mark as Paid', defaultDate, includeMe
           paidThrough: includeMethod ? form.elements.paidThrough.value : undefined,
           referenceNumber: includeMethod ? form.elements.referenceNumber.value : undefined,
           bankName: includeMethod ? form.elements.bankName.value : undefined,
+          paidBy: includeMethod ? form.elements.paidBy.value : undefined,
         });
+      } catch (err) {
+        errBox.textContent = err.message || 'Something went wrong.';
+        errBox.hidden = false;
+        setButtonLoading(btn, false);
+      }
+    });
+  });
+}
+
+// Opens a small modal for the opposite situation to openSettlePaymentModal:
+// an installment that was DUE but never actually changed hands on that
+// date (either side "wasn't able to give or take" the money) and needs a
+// new expected date instead. The original pending row is kept exactly as
+// it was - marked so it reads as missed/rescheduled instead of "Pending",
+// and dropped out of every pending/upcoming total - and a brand new
+// pending row is created for the new date, so both the missed promise and
+// the new one stay on record; nothing is ever deleted or silently
+// overwritten. `onConfirm` receives { newDueDate, reason }.
+function openRescheduleModal({ title = 'Reschedule Payment', originalDueDate, onConfirm, onCancel }) {
+  openCustomModal(title, `
+    <form id="reschedule-form">
+      <p class="text-muted" style="margin:0 0 14px; font-size:12.5px; line-height:1.6;">
+        This wasn't given or received on the date it was due${originalDueDate ? ` (${escapeHtml(formatDate(originalDueDate))})` : ''}.
+        That stays on record as missed - nothing is deleted - and a new pending installment is
+        created for whatever date it's now expected.
+      </p>
+      <div class="field-grid">
+        <label class="field"><span>New expected date</span><input type="date" name="newDueDate" required /></label>
+        <label class="field field-wide"><span>Reason / notes (optional)</span><input type="text" name="reason" placeholder="e.g. buyer asked for more time" /></label>
+      </div>
+      <div class="modal-error" id="reschedule-error" hidden style="margin-top:14px;"></div>
+      <div class="modal-actions" style="margin-top:16px;">
+        <button type="button" class="btn btn-ghost" data-reschedule-cancel>Cancel</button>
+        <button type="submit" class="btn btn-primary" id="reschedule-submit">Confirm</button>
+      </div>
+    </form>
+  `, (root) => {
+    root.querySelector('[data-reschedule-cancel]').addEventListener('click', () => { if (onCancel) onCancel(); });
+    root.querySelector('#reschedule-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const errBox = root.querySelector('#reschedule-error');
+      const btn = root.querySelector('#reschedule-submit');
+      setButtonLoading(btn, true, 'Saving…');
+      try {
+        await onConfirm({ newDueDate: form.elements.newDueDate.value, reason: form.elements.reason.value });
       } catch (err) {
         errBox.textContent = err.message || 'Something went wrong.';
         errBox.hidden = false;
@@ -574,11 +630,12 @@ function collectInstallmentPlan(root) {
   const upfrontPaidThrough = root.querySelector('[name=paidThrough]') ? root.querySelector('[name=paidThrough]').value : '';
   const upfrontReferenceNumber = root.querySelector('[name=referenceNumber]') ? root.querySelector('[name=referenceNumber]').value : '';
   const upfrontBankName = root.querySelector('[name=bankName]') ? root.querySelector('[name=bankName]').value : '';
+  const upfrontPaidBy = root.querySelector('[name=paidBy]') ? root.querySelector('[name=paidBy]').value : '';
   const installments = Array.from(root.querySelectorAll('[data-installment-row]'))
     .map((rowEl) => ({
       amount: Number(rowEl.querySelector('.inst-amount').value) || 0,
       dueDate: rowEl.querySelector('.inst-duedate').value,
     }))
     .filter((row) => row.amount > 0);
-  return { upfrontAmount, upfrontDate, upfrontPaidThrough, upfrontReferenceNumber, upfrontBankName, installments };
+  return { upfrontAmount, upfrontDate, upfrontPaidThrough, upfrontReferenceNumber, upfrontBankName, upfrontPaidBy, installments };
 }

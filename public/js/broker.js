@@ -62,7 +62,7 @@
       <tr>
         <td>${formatDate(a.date || a.createdAt)}</td>
         <td class="text-right num" style="font-weight:600;">${formatCurrency(a.amount)}</td>
-        <td class="text-muted" style="font-size:12px;">${escapeHtml(paymentMethodLabel(a)) || '—'}</td>
+        <td class="text-muted" style="font-size:12px;">${[paymentMethodLabel(a), paidByLabel(a)].filter(Boolean).join('<br>') || '—'}</td>
         <td class="text-muted">${escapeHtml(a.notes || '')}</td>
         <td><div class="row-actions"><button type="button" class="btn btn-sm btn-danger" data-delete-advance="${a.id}">Delete</button></div></td>
       </tr>
@@ -92,6 +92,7 @@
         ] },
         { name: 'referenceNumber', label: 'Pay Order / Cheque Number' },
         { name: 'bankName', label: 'Bank Name' },
+        { name: 'paidBy', label: 'Paid By (if different from the broker themself)' },
         { name: 'notes', label: 'Notes', type: 'textarea' },
       ],
       onSubmit: async (values) => {
@@ -105,7 +106,7 @@
 
   // The earliest commission installment that's promised but not yet paid.
   function nextDueOf(payments) {
-    const pending = (payments || []).filter((p) => !p.paidDate && p.dueDate);
+    const pending = (payments || []).filter((p) => !p.paidDate && p.dueDate && p.status !== 'rescheduled');
     if (!pending.length) return null;
     pending.sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
     const next = pending[0];
@@ -119,22 +120,31 @@
       return;
     }
     body.innerHTML = deals.map((d) => {
-      const due = nextDueOf(d.payments);
+      const cancelled = d.status === 'cancelled';
+      const due = cancelled ? null : nextDueOf(d.payments);
       const dueCell = due
         ? `${formatCurrency(due.amount)}<div style="font-size:11px; ${due.overdue ? 'color:var(--danger); font-weight:700;' : 'color:var(--text-muted);'}">${formatDate(due.dueDate)}${due.overdue ? ' · OVERDUE' : ''}</div>`
         : '<span class="text-muted">—</span>';
       return `
-      <tr>
-        <td style="font-weight:700;">${escapeHtml(d.description)}${d.dealDate ? `<div class="text-muted" style="font-size:11px; font-weight:400;">${formatDate(d.dealDate)}</div>` : ''}</td>
+      <tr style="${cancelled ? 'opacity:0.6;' : ''}">
+        <td style="font-weight:700;">
+          <span style="${cancelled ? 'text-decoration:line-through;' : ''}">${escapeHtml(d.description)}</span>
+          ${cancelled ? '<span class="badge badge-danger" style="margin-left:6px;">Cancelled</span>' : ''}
+          ${d.dealDate ? `<div class="text-muted" style="font-size:11px; font-weight:400;">${formatDate(d.dealDate)}</div>` : ''}
+          ${cancelled && d.cancelReason ? `<div class="text-muted" style="font-size:11px; font-weight:400;">Reason: ${escapeHtml(d.cancelReason)}</div>` : ''}
+        </td>
         <td class="text-right num">${d.dealValue ? formatCurrency(d.dealValue) : '<span class="text-muted">—</span>'}</td>
-        <td class="text-right num" style="font-weight:700;">${formatCurrency(d.stats.commissionAmount)}</td>
+        <td class="text-right num" style="font-weight:700;">${cancelled ? '<span class="text-muted">Void</span>' : formatCurrency(d.stats.commissionAmount)}</td>
         <td class="text-right num" style="color:var(--success);">${formatCurrency(d.stats.totalPaid)}</td>
-        <td class="text-right num" style="color:${d.stats.remaining > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${formatCurrency(d.stats.remaining)}</td>
+        <td class="text-right num" style="color:${!cancelled && d.stats.remaining > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${cancelled ? '<span class="text-muted">—</span>' : formatCurrency(d.stats.remaining)}</td>
         <td class="num">${dueCell}</td>
         <td>
           <div class="row-actions">
             <button class="btn btn-ghost btn-sm" data-pay="${d.id}">Commission</button>
             <button class="btn btn-ghost btn-sm" data-edit-deal="${d.id}">Edit</button>
+            ${cancelled
+              ? `<button class="btn btn-ghost btn-sm" data-reactivate-deal="${d.id}">Reactivate</button>`
+              : `<button class="btn btn-ghost btn-sm" data-cancel-deal="${d.id}">Cancel Deal</button>`}
             <button class="btn btn-danger btn-sm" data-delete-deal="${d.id}">Delete</button>
           </div>
         </td>
@@ -170,6 +180,8 @@
   document.getElementById('deals-body').addEventListener('click', (e) => {
     const payBtn = e.target.closest('[data-pay]');
     const editBtn = e.target.closest('[data-edit-deal]');
+    const cancelBtn = e.target.closest('[data-cancel-deal]');
+    const reactivateBtn = e.target.closest('[data-reactivate-deal]');
     const delBtn = e.target.closest('[data-delete-deal]');
     if (payBtn) openDealPaymentsModal(payBtn.dataset.pay);
     if (editBtn) {
@@ -184,9 +196,33 @@
         },
       });
     }
+    // Cancel keeps the deal on record (with a "Cancelled" badge, and no
+    // longer counted as owed commission) instead of erasing that it ever
+    // happened - Delete below is the separate, permanent action for that.
+    if (cancelBtn) {
+      openFormModal({
+        title: 'Cancel Deal',
+        submitLabel: 'Cancel Deal',
+        fields: [
+          { name: 'cancelReason', label: 'Reason (optional)', type: 'textarea', placeholder: 'e.g. buyer backed out' },
+        ],
+        onSubmit: async (values) => {
+          await apiRequest(`/broker-deals/${cancelBtn.dataset.cancelDeal}`, { method: 'PUT', body: { status: 'cancelled', cancelReason: values.cancelReason } });
+          load();
+        },
+      });
+    }
+    if (reactivateBtn) {
+      withButtonBusy(reactivateBtn, async () => {
+        try {
+          await apiRequest(`/broker-deals/${reactivateBtn.dataset.reactivateDeal}`, { method: 'PUT', body: { status: 'active', cancelReason: '' } });
+          load();
+        } catch (err) { showBanner(err.message); }
+      })();
+    }
     if (delBtn) {
       withButtonBusy(delBtn, async () => {
-        if (!confirm('Delete this deal and all of its commission payment history?')) return;
+        if (!confirm('Permanently delete this deal and all of its commission payment history? This cannot be undone - if you just want to void the deal but keep it on record, use "Cancel Deal" instead.')) return;
         try {
           await apiRequest(`/broker-deals/${delBtn.dataset.deleteDeal}`, { method: 'DELETE' });
           load();
@@ -196,32 +232,37 @@
   });
 
   function paymentsModalHtml(deal) {
-    const rows = deal.payments.length ? deal.payments.map((p) => `
-      <tr>
+    const cancelled = deal.status === 'cancelled';
+    const rows = deal.payments.length ? deal.payments.map((p) => {
+      const rescheduled = p.status === 'rescheduled';
+      const settledCell = rescheduled
+        ? '<span class="badge badge-muted">Missed — Rescheduled</span>'
+        : (p.paidDate ? formatDate(p.paidDate) : '<span class="badge badge-warning">Pending</span>');
+      const methodLine = [paymentMethodLabel(p), paidByLabel(p)].filter(Boolean).join('<br>');
+      return `
+      <tr style="${rescheduled ? 'opacity:0.65;' : ''}">
         <td class="text-right num" style="color:var(--success); font-weight:600;">${formatCurrency(p.amount)}</td>
         <td>${formatDate(p.dueDate)}</td>
-        <td>${p.paidDate ? formatDate(p.paidDate) : '<span class="badge badge-warning">Pending</span>'}</td>
-        <td class="text-muted" style="font-size:12px;">${escapeHtml(paymentMethodLabel(p)) || '—'}</td>
+        <td>${settledCell}</td>
+        <td class="text-muted" style="font-size:12px;">${methodLine || '—'}</td>
         <td class="text-muted">${escapeHtml(p.notes || '')}</td>
         <td>
           <div class="row-actions">
             <button type="button" class="btn btn-sm btn-ghost" data-print="${p.id}">🖨 Print</button>
-            ${!p.paidDate ? `<button type="button" class="btn btn-sm btn-ghost" data-mark-paid="${p.id}">Mark Paid</button>` : ''}
+            ${!p.paidDate && !rescheduled ? `<button type="button" class="btn btn-sm btn-ghost" data-mark-paid="${p.id}">Mark Paid</button>` : ''}
+            ${!p.paidDate && !rescheduled ? `<button type="button" class="btn btn-sm btn-ghost" data-reschedule="${p.id}" title="Wasn't given/received on time — set a new date">Reschedule</button>` : ''}
             <button type="button" class="btn btn-sm btn-danger" data-delete-payment="${p.id}">Delete</button>
           </div>
         </td>
       </tr>
-    `).join('') : '<tr class="empty-row"><td colspan="6">No commission payments recorded yet.</td></tr>';
+    `;
+    }).join('') : '<tr class="empty-row"><td colspan="6">No commission payments recorded yet.</td></tr>';
 
     const advanceBalance = state.broker.stats.advanceBalance;
 
-    return `
-      <div class="table-wrap" style="margin-bottom:18px;">
-        <table>
-          <thead><tr><th class="text-right">Amount</th><th>Due date</th><th>Paid date</th><th>Paid Through</th><th>Notes</th><th></th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
+    const addPaymentSection = cancelled ? `
+      <p class="text-muted" style="font-size:12.5px;">This deal is cancelled — its commission is void, so no new payments can be added. Reactivate it from the Deals list first if that was a mistake.</p>
+    ` : `
       <div class="modal-actions" style="justify-content:flex-start; margin-bottom:16px;">
         <button type="button" class="btn btn-accent btn-sm" data-open-plan>+ Create Installment Plan</button>
       </div>
@@ -244,6 +285,16 @@
         <div class="modal-actions"><button type="submit" class="btn btn-primary" id="add-payment-submit">Add Payment</button></div>
       </form>
     `;
+
+    return `
+      <div class="table-wrap" style="margin-bottom:18px;">
+        <table>
+          <thead><tr><th class="text-right">Amount</th><th>Due date</th><th>Paid date</th><th>Paid Through</th><th>Notes</th><th></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      ${addPaymentSection}
+    `;
   }
 
   function openDealPaymentsModal(dealId) {
@@ -252,37 +303,40 @@
     openCustomModal(`Commission — ${deal.description}`, paymentsModalHtml(deal), (root) => {
       const submitBtn = root.querySelector('#add-payment-submit');
       const sourceSelect = root.querySelector('#payment-source');
-      const methodFields = root.querySelector('#payment-method-fields');
-      const toggleMethodFields = () => { methodFields.hidden = sourceSelect.value === 'advance'; };
-      sourceSelect.addEventListener('change', toggleMethodFields);
-      toggleMethodFields();
-      root.querySelector('#add-payment-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const form = e.target;
-        const errBox = root.querySelector('#payment-form-error');
-        setButtonLoading(submitBtn, true, 'Adding…');
-        try {
-          await apiRequest(`/broker-deals/${dealId}/payments`, {
-            method: 'POST',
-            body: {
-              amount: form.elements.amount.value,
-              dueDate: form.elements.dueDate.value,
-              paidDate: form.elements.paidDate.value,
-              source: form.elements.source.value,
-              paidThrough: form.elements.paidThrough.value,
-              referenceNumber: form.elements.referenceNumber.value,
-              bankName: form.elements.bankName.value,
-              notes: form.elements.notes.value,
-            },
-          });
-          await load();
-          openDealPaymentsModal(dealId);
-        } catch (err) {
-          errBox.textContent = err.message;
-          errBox.hidden = false;
-          setButtonLoading(submitBtn, false);
-        }
-      });
+      if (submitBtn && sourceSelect) {
+        const methodFields = root.querySelector('#payment-method-fields');
+        const toggleMethodFields = () => { methodFields.hidden = sourceSelect.value === 'advance'; };
+        sourceSelect.addEventListener('change', toggleMethodFields);
+        toggleMethodFields();
+        root.querySelector('#add-payment-form').addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const form = e.target;
+          const errBox = root.querySelector('#payment-form-error');
+          setButtonLoading(submitBtn, true, 'Adding…');
+          try {
+            await apiRequest(`/broker-deals/${dealId}/payments`, {
+              method: 'POST',
+              body: {
+                amount: form.elements.amount.value,
+                dueDate: form.elements.dueDate.value,
+                paidDate: form.elements.paidDate.value,
+                source: form.elements.source.value,
+                paidThrough: form.elements.paidThrough.value,
+                referenceNumber: form.elements.referenceNumber.value,
+                bankName: form.elements.bankName.value,
+                paidBy: form.elements.paidBy.value,
+                notes: form.elements.notes.value,
+              },
+            });
+            await load();
+            openDealPaymentsModal(dealId);
+          } catch (err) {
+            errBox.textContent = err.message;
+            errBox.hidden = false;
+            setButtonLoading(submitBtn, false);
+          }
+        });
+      }
       root.querySelectorAll('[data-mark-paid]').forEach((btn) => {
         btn.addEventListener('click', () => {
           const payment = deal.payments.find((p) => p.id === btn.dataset.markPaid);
@@ -290,10 +344,32 @@
             title: 'Mark Commission Paid',
             defaultDate: (payment && payment.dueDate) || today(),
             onCancel: () => openDealPaymentsModal(dealId),
-            onConfirm: async ({ paidDate, paidThrough, referenceNumber, bankName }) => {
+            onConfirm: async ({ paidDate, paidThrough, referenceNumber, bankName, paidBy }) => {
               await apiRequest(`/broker-payments/${btn.dataset.markPaid}`, {
                 method: 'PUT',
-                body: { paidDate, paidThrough, referenceNumber, bankName },
+                body: { paidDate, paidThrough, referenceNumber, bankName, paidBy },
+              });
+              await load();
+              openDealPaymentsModal(dealId);
+            },
+          });
+        });
+      });
+      root.querySelectorAll('[data-reschedule]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const payment = deal.payments.find((p) => p.id === btn.dataset.reschedule);
+          openRescheduleModal({
+            title: 'Reschedule Commission Payment',
+            originalDueDate: payment && payment.dueDate,
+            onCancel: () => openDealPaymentsModal(dealId),
+            onConfirm: async ({ newDueDate, reason }) => {
+              await apiRequest(`/broker-payments/${btn.dataset.reschedule}`, {
+                method: 'PUT',
+                body: { status: 'rescheduled', notes: `${payment.notes ? payment.notes + ' — ' : ''}Missed, rescheduled to ${formatDate(newDueDate)}${reason ? ' (' + reason + ')' : ''}` },
+              });
+              await apiRequest(`/broker-deals/${dealId}/payments`, {
+                method: 'POST',
+                body: { amount: payment.amount, dueDate: newDueDate, notes: `Rescheduled from ${formatDate(payment.dueDate)}${reason ? ' — ' + reason : ''}` },
               });
               await load();
               openDealPaymentsModal(dealId);
@@ -311,7 +387,8 @@
           } catch (err) { showBanner(err.message); }
         }));
       });
-      root.querySelector('[data-open-plan]').addEventListener('click', () => openDealInstallmentPlanModal(dealId));
+      const openPlanBtn = root.querySelector('[data-open-plan]');
+      if (openPlanBtn) openPlanBtn.addEventListener('click', () => openDealInstallmentPlanModal(dealId));
       root.querySelectorAll('[data-print]').forEach((btn) => {
         btn.addEventListener('click', () => {
           const url = `receipt.html?apiBase=/brokers&brokerId=${encodeURIComponent(brokerId)}&dealId=${encodeURIComponent(dealId)}&paymentId=${encodeURIComponent(btn.dataset.print)}`;
@@ -333,7 +410,7 @@
         e.preventDefault();
         const errBox = root.querySelector('#plan-error');
         const submitBtn = root.querySelector('[data-plan-submit]');
-        const { upfrontAmount, upfrontDate, upfrontPaidThrough, upfrontReferenceNumber, upfrontBankName, installments } = collectInstallmentPlan(root);
+        const { upfrontAmount, upfrontDate, upfrontPaidThrough, upfrontReferenceNumber, upfrontBankName, upfrontPaidBy, installments } = collectInstallmentPlan(root);
         if (upfrontAmount <= 0 && !installments.length) {
           errBox.textContent = 'Enter an upfront amount and/or at least one installment.';
           errBox.hidden = false;
@@ -353,7 +430,7 @@
               method: 'POST',
               body: {
                 amount: upfrontAmount, paidDate: upfrontDate, notes: 'Upfront commission',
-                paidThrough: upfrontPaidThrough, referenceNumber: upfrontReferenceNumber, bankName: upfrontBankName,
+                paidThrough: upfrontPaidThrough, referenceNumber: upfrontReferenceNumber, bankName: upfrontBankName, paidBy: upfrontPaidBy,
               },
             });
           }

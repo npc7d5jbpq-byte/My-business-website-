@@ -177,7 +177,7 @@ router.delete('/plots/:id', (req, res) => {
 router.post('/plots/:id/payments', (req, res) => {
   const plot = db.get('plots', req.params.id);
   if (!plot) return res.status(404).json({ error: 'Plot not found.' });
-  const { amount, dueDate, paidDate, paidThrough, referenceNumber, bankName, notes } = req.body;
+  const { amount, dueDate, paidDate, paidThrough, referenceNumber, bankName, paidBy, notes } = req.body;
   if (!amount || Number(amount) <= 0) return res.status(400).json({ error: 'A positive amount is required.' });
   const payment = db.insert('plotPayments', {
     parentId: plot.id,
@@ -187,6 +187,8 @@ router.post('/plots/:id/payments', (req, res) => {
     paidThrough: paidThrough || '',
     referenceNumber: referenceNumber || '',
     bankName: bankName || '',
+    paidBy: paidBy || '',
+    status: '',
     notes: notes || '',
   });
   res.status(201).json(payment);
@@ -196,7 +198,7 @@ router.put('/plot-payments/:id', (req, res) => {
   const row = db.get('plotPayments', req.params.id);
   if (!row) return res.status(404).json({ error: 'Payment not found.' });
   const patch = {};
-  for (const f of ['amount', 'dueDate', 'paidDate', 'paidThrough', 'referenceNumber', 'bankName', 'notes']) {
+  for (const f of ['amount', 'dueDate', 'paidDate', 'paidThrough', 'referenceNumber', 'bankName', 'paidBy', 'status', 'notes']) {
     if (req.body[f] !== undefined) patch[f] = f === 'amount' ? Number(req.body[f]) || 0 : req.body[f];
   }
   res.json(db.update('plotPayments', req.params.id, patch));
