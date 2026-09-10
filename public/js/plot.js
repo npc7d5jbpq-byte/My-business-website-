@@ -54,8 +54,12 @@
     document.getElementById('reactivate-plot-btn').hidden = !cancelled;
 
     const due = nextDueOf(p.payments);
+    const rate = pricePerMarlaOf(p, 'price');
+    const priceSubBits = [];
+    if (rate != null) priceSubBits.push(`${formatCurrency(rate)}/Marla`);
+    if (p.discount) priceSubBits.push(`Rs. ${formatCurrency(p.discount).replace('Rs. ', '')} discount given`);
     const tiles = [
-      { label: 'Sale Price', value: p.price, sub: '', accent: '' },
+      { label: 'Sale Price', value: p.price, sub: priceSubBits.join(' · '), accent: '' },
       { label: 'Received', value: p.received, sub: 'From the buyer so far', accent: 'accent-success' },
       { label: 'Remaining', value: p.remaining, sub: 'Still owed by the buyer', accent: p.remaining > 0 ? 'accent-danger' : '' },
       { label: 'Next Due', value: due ? due.amount : 0, sub: due ? `${formatDate(due.dueDate)}${due.overdue ? ' · OVERDUE' : ''}` : 'Nothing scheduled', accent: due && due.overdue ? 'accent-danger' : '' },
@@ -298,6 +302,7 @@
       ] },
       { name: 'frontFt', label: 'Front (feet)', type: 'number', step: '0.01', value: v.frontFt != null ? v.frontFt : 0 },
       { name: 'lengthFt', label: 'Length / Depth (feet)', type: 'number', step: '0.01', value: v.lengthFt != null ? v.lengthFt : 0 },
+      ...priceCalculatorFields(v),
       { name: 'price', label: 'Sale price (Rs.)', type: 'number', step: '0.01', value: v.price != null ? v.price : 0 },
       { name: 'status', label: 'Status', type: 'select', value: v.status || 'available', options: [
         { value: 'available', label: 'Available' }, { value: 'reserved', label: 'Reserved' }, { value: 'sold', label: 'Sold' },
@@ -312,10 +317,19 @@
 
   function resolvePlotSize(values) {
     const resolved = Object.assign({}, values);
-    if (resolved.size === OTHER_SIZE) {
+    const usedOther = resolved.size === OTHER_SIZE;
+    if (usedOther) {
       resolved.size = (resolved.sizeCustom || '').trim() || OTHER_SIZE;
     }
     delete resolved.sizeCustom;
+    // Keep the displayed "Size" text in sync with the price calculator's
+    // Size fields whenever they were used, same as colony.js's Add Plot
+    // form - see the comment there for why.
+    const sizeValue = Number(resolved.sizeValue) || 0;
+    if (sizeValue > 0 && !usedOther) {
+      const unitLabel = { marla: 'Marla', kanal: 'Kanal', acre: 'Acre' }[resolved.sizeUnit] || 'Marla';
+      resolved.size = `${sizeValue} ${unitLabel}`;
+    }
     return resolved;
   }
 
@@ -334,6 +348,7 @@
         load();
       },
     });
+    wirePriceCalculator('price');
   });
 
   document.getElementById('cancel-sale-btn').addEventListener('click', () => {
@@ -368,4 +383,5 @@
   }));
 
   load();
+  renderAttachmentsSection('plot-documents', 'plot', plotId);
 })();

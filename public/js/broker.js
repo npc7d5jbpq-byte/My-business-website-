@@ -512,4 +512,5 @@
   }));
 
   load();
+  renderAttachmentsSection('broker-documents', 'broker', brokerId);
 })();

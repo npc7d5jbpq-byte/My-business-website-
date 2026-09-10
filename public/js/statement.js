@@ -63,6 +63,7 @@
           partySub: [plot.buyerPhone, plot.buyerCnic ? `CNIC: ${plot.buyerCnic}` : null].filter(Boolean).join(' · '),
           direction: 'received',
           totalPrice: Number(plot.price) || 0,
+          discount: Number(plot.discount) || 0,
           totalSettled: Number(plot.received) || 0,
           remaining: Number(plot.remaining) || 0,
           payments: plot.payments || [],
@@ -96,6 +97,7 @@
         partyLabel: 'Buyer', partyName: entity.buyerName || '—', partySub: entity.buyerPhone || '',
         direction: 'received',
         totalPrice: Number(entity.salePrice) || 0,
+        discount: Number(entity.discount) || 0,
         totalSettled: Number(entity.stats.totalReceived) || 0,
         remaining: Number(entity.stats.totalReceivable) || 0,
         payments: receivedPayments,
@@ -134,6 +136,7 @@
         <div class="s-info-box">
           <div class="s-info-label">${escapeHtml((section.sectionLabel || '').toUpperCase())} TRANSACTION</div>
           <div class="s-info-name">${escapeHtml(section.priceLabel)}: ${formatCurrency(section.totalPrice)}</div>
+          ${section.discount ? `<div class="s-info-sub">Discount given: Rs. ${formatCurrency(section.discount).replace('Rs. ', '')} (list price was ${formatCurrency(section.totalPrice + section.discount)})</div>` : ''}
         </div>
         <div class="s-info-box">
           <div class="s-info-label">${escapeHtml(section.partyLabel.toUpperCase())}</div>
@@ -155,7 +158,11 @@
 
       <div class="s-totals">
         <div class="s-totals-box">
-          <div class="s-totals-row"><span>${escapeHtml(section.priceLabel)}</span><span>${formatCurrency(section.totalPrice)}</span></div>
+          ${section.discount ? `
+            <div class="s-totals-row"><span>List Price</span><span>${formatCurrency(section.totalPrice + section.discount)}</span></div>
+            <div class="s-totals-row"><span>Discount Given</span><span>− ${formatCurrency(section.discount)}</span></div>
+          ` : ''}
+          <div class="s-totals-row"><span>${escapeHtml(section.priceLabel)}${section.discount ? ' (after discount)' : ''}</span><span>${formatCurrency(section.totalPrice)}</span></div>
           <div class="s-totals-row"><span>${direction === 'paid' ? 'Total Paid to Date' : 'Total Received to Date'}</span><span>${formatCurrency(section.totalSettled)}</span></div>
           <div class="s-totals-row grand"><span>Balance Due</span><span>${formatCurrency(section.remaining)}</span></div>
         </div>

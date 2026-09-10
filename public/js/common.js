@@ -206,6 +206,97 @@ function wireGlobalSearch() {
   });
 }
 
+// ---- Document attachments (scanned CNIC, sale agreement, registry copy,
+// etc.) attached directly to a colony/plot/agricultural-shop-commercial
+// record/broker/person ----
+
+function attachmentIcon(mimeType) {
+  if (/^image\//.test(mimeType || '')) return '🖼️';
+  if (mimeType === 'application/pdf') return '📄';
+  return '📎';
+}
+
+function formatFileSize(bytes) {
+  const n = Number(bytes) || 0;
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+// Renders a self-contained "Documents" section (a list of what's attached
+// plus an upload form) into the given container element, for one record.
+// Re-run it (it re-renders in place) after an upload/delete to refresh.
+async function renderAttachmentsSection(containerId, parentType, parentId) {
+  const container = document.getElementById(containerId);
+  if (!container || !parentId) return;
+  container.innerHTML = '<div class="text-muted" style="font-size:12.5px;">Loading documents…</div>';
+  let rows = [];
+  try {
+    rows = await apiRequest(`/attachments?parentType=${encodeURIComponent(parentType)}&parentId=${encodeURIComponent(parentId)}`);
+  } catch (err) {
+    container.innerHTML = `<div class="text-muted" style="font-size:12.5px;">Could not load documents: ${escapeHtml(err.message)}</div>`;
+    return;
+  }
+
+  const listHtml = rows.length ? rows.map((a) => `
+    <div class="attachment-card">
+      <a href="/api/attachments/${a.id}/file" target="_blank" rel="noopener" class="attachment-link" title="${escapeHtml(a.originalName)}">
+        <span class="attachment-icon">${attachmentIcon(a.mimeType)}</span>
+        <span class="attachment-name">${escapeHtml(a.label || a.originalName)}</span>
+      </a>
+      <span class="attachment-meta">${formatFileSize(a.size)} · ${formatDate(a.createdAt)}</span>
+      <button type="button" class="btn btn-ghost btn-sm" data-delete-attachment="${a.id}">Delete</button>
+    </div>
+  `).join('') : '<div class="text-muted" style="font-size:12.5px; margin-bottom:10px;">No documents attached yet.</div>';
+
+  container.innerHTML = `
+    <div class="attachment-list">${listHtml}</div>
+    <form class="attachment-upload-form" id="${containerId}-upload-form">
+      <input type="file" name="file" required />
+      <input type="text" name="label" placeholder="Label (e.g. CNIC front, Sale agreement, Registry copy)" />
+      <button type="submit" class="btn btn-accent btn-sm">+ Attach Document</button>
+    </form>
+    <div class="modal-error" id="${containerId}-upload-error" hidden></div>
+  `;
+
+  container.querySelectorAll('[data-delete-attachment]').forEach((btn) => {
+    btn.addEventListener('click', withButtonBusy(btn, async () => {
+      if (!confirm('Delete this document? This cannot be undone.')) return;
+      try {
+        await apiRequest(`/attachments/${btn.dataset.deleteAttachment}`, { method: 'DELETE' });
+        renderAttachmentsSection(containerId, parentType, parentId);
+      } catch (err) { showBanner(err.message); }
+    }));
+  });
+
+  const form = document.getElementById(`${containerId}-upload-form`);
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const errBox = document.getElementById(`${containerId}-upload-error`);
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const fileInput = form.querySelector('input[type="file"]');
+    if (!fileInput.files[0]) return;
+    setButtonLoading(submitBtn, true, 'Uploading…');
+    errBox.hidden = true;
+    try {
+      const fd = new FormData(form);
+      fd.set('parentType', parentType);
+      fd.set('parentId', parentId);
+      // Uses fetch directly (not apiRequest) - a file upload is
+      // multipart/form-data, not the JSON body apiRequest always sends.
+      const res = await fetch('/api/attachments', { method: 'POST', body: fd, credentials: 'include' });
+      if (res.status === 401) { window.location.href = 'login.html'; return; }
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error((data && data.error) || `Upload failed (${res.status}).`);
+      renderAttachmentsSection(containerId, parentType, parentId);
+    } catch (err) {
+      errBox.textContent = err.message;
+      errBox.hidden = false;
+      setButtonLoading(submitBtn, false);
+    }
+  });
+}
+
 function setPageTitle(title) {
   const el = document.getElementById('topbar-title');
   if (el) el.textContent = title;
@@ -507,6 +598,89 @@ function paymentMethodLabel(p) {
 // not recorded.
 function paidByLabel(p) {
   return p && p.paidBy ? `Paid by ${p.paidBy}` : '';
+}
+
+// ---- Price-per-Marla calculator (colony plots + agricultural/shops/
+// commercial records) ----
+//
+// Local size conventions: 1 Kanal = 20 Marla, 1 Acre = 160 Marla.
+const SIZE_UNIT_TO_MARLA = { marla: 1, kanal: 20, acre: 160 };
+const SIZE_UNIT_OPTIONS = [
+  { value: 'marla', label: 'Marla' },
+  { value: 'kanal', label: 'Kanal (= 20 Marla)' },
+  { value: 'acre', label: 'Acre (= 160 Marla)' },
+];
+
+function toMarla(value, unit) {
+  return (Number(value) || 0) * (SIZE_UNIT_TO_MARLA[unit] || 1);
+}
+
+// Best-effort fallback for records with no structured sizeValue/sizeUnit
+// (older records, or ones entered via the free-text size/area field only)
+// - reads a marla-equivalent straight out of text like "5 Marla" or
+// "2 Kanal" or "10 Acres" wherever that pattern appears.
+function parseSizeToMarla(text) {
+  const m = String(text || '').match(/(\d+(?:\.\d+)?)\s*(marla|kanal|acre)/i);
+  if (!m) return null;
+  return Number(m[1]) * (SIZE_UNIT_TO_MARLA[m[2].toLowerCase()] || 1);
+}
+
+// The marla-equivalent size to use for a price-per-marla figure - prefers
+// the structured sizeValue/sizeUnit fields, falls back to parsing the
+// free-text size/area string for records that predate them.
+function marlaEquivalentOf(record) {
+  if (record && Number(record.sizeValue) > 0) return toMarla(record.sizeValue, record.sizeUnit || 'marla');
+  return parseSizeToMarla(record && (record.size || record.area));
+}
+
+// Rs. per marla, computed fresh from a price field ÷ size (not read back
+// from a stored pricePerMarla, which can go stale once price is edited by
+// hand) - null when there's no size to divide by. Used for a side-by-side
+// price/marla comparison across a colony's plots.
+function pricePerMarlaOf(record, priceField) {
+  const marla = marlaEquivalentOf(record);
+  const price = Number(record && record[priceField]) || 0;
+  if (!marla || marla <= 0 || !price) return null;
+  return price / marla;
+}
+
+// Field descriptors (for openFormModal's `fields` array) for the "figure
+// the price out for me" calculator: size (value + unit) x price per
+// Marla, minus an optional discount. Spread these into a form's fields
+// array right before the actual price field, then call
+// wirePriceCalculator() after the modal opens to wire the live auto-fill.
+function priceCalculatorFields(v) {
+  v = v || {};
+  return [
+    { name: 'sizeValue', label: 'Size (for price calculator, optional)', type: 'number', step: '0.01', value: v.sizeValue || '' },
+    { name: 'sizeUnit', label: 'Size Unit', type: 'select', value: v.sizeUnit || 'marla', options: SIZE_UNIT_OPTIONS },
+    { name: 'pricePerMarla', label: 'Price per Marla (Rs., optional)', type: 'number', step: '0.01', value: v.pricePerMarla || '' },
+    { name: 'discount', label: 'Discount (Rs., if given)', type: 'number', step: '0.01', value: v.discount || '' },
+  ];
+}
+
+// Wires the calculator fields above to auto-fill a target price field
+// (by name) inside the currently-open #modal-form, the same
+// "auto-calculates but stays directly editable" pattern used for the
+// broker commission % calculator. Call right after openFormModal()/
+// openCustomModal() returns (both are synchronous, so the form already
+// exists in the DOM by the time this runs).
+function wirePriceCalculator(priceFieldName, formEl) {
+  const form = formEl || document.getElementById('modal-form');
+  if (!form || !form.elements.sizeValue || !form.elements[priceFieldName]) return;
+  const recalc = () => {
+    const sizeValue = Number(form.elements.sizeValue.value) || 0;
+    const sizeUnit = form.elements.sizeUnit ? form.elements.sizeUnit.value : 'marla';
+    const perMarla = Number(form.elements.pricePerMarla.value) || 0;
+    const discount = Number(form.elements.discount.value) || 0;
+    if (sizeValue > 0 && perMarla > 0) {
+      const total = Math.max(0, toMarla(sizeValue, sizeUnit) * perMarla - discount);
+      form.elements[priceFieldName].value = Math.round(total * 100) / 100;
+    }
+  };
+  ['sizeValue', 'sizeUnit', 'pricePerMarla', 'discount'].forEach((name) => {
+    if (form.elements[name]) form.elements[name].addEventListener('input', recalc);
+  });
 }
 
 // Opens a small modal to record how/when a pending payment was actually

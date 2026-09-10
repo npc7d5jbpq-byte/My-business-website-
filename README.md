@@ -158,6 +158,31 @@ machine.
   colony plot they bought, agricultural land they sold to the office, a
   broker profile, all in one place, each with a link straight to that
   record.
+- **Document attachments** — attach scanned paperwork (a CNIC, a sale
+  agreement, a registry copy — any file type, up to 20MB) directly to a
+  colony, a plot, an agricultural/shop/commercial record, a broker, or a
+  person, via a **Documents** section on that record's own page. Click a
+  document to view it (images and PDFs open right in the browser tab;
+  anything else downloads) or delete it. Deleting a colony/plot/record/
+  broker also deletes whatever was attached to it. These files live in the
+  data folder alongside `db.json` but are **not** included in the automatic
+  JSON snapshot backups described below — a full copy of the data folder
+  captures them the same way it would capture `db.json` itself.
+- **Price-per-Marla calculator, with a discount option** — on a colony
+  plot (Add/Edit) or a Mark Sold form (agricultural land/shops/commercial),
+  an optional calculator fills in the price automatically: enter the
+  **Size** (in Marla, Kanal, or Acre — 1 Kanal = 20 Marla, 1 Acre =
+  160 Marla) and a **Price per Marla**, and the price field fills itself in
+  (still directly editable/overridable, exactly like the commission %
+  calculator). An optional **Discount**, if given, is subtracted from that
+  computed price — and is shown/printed on that plot/record's receipt and
+  full statement whenever one was given (list price, discount, and the
+  final price after discount, all three). A colony's Plots table also gets
+  a **Price/Marla** column, computed fresh from each plot's actual price
+  ÷ size (so it reflects any discount actually given, not just the rate
+  originally typed in) with a flag when a plot is 10%+ above or below the
+  colony's average rate — an under- or over-priced plot stands out at a
+  glance.
 
 ## Data Persistence & Backups
 
@@ -354,6 +379,7 @@ src/routes/assetModule.js  Shared buy/sell/payments logic for the 3 modules belo
 src/routes/brokers.js    Brokers, their deals, and each deal's commission payments
 src/routes/dashboard.js  Cross-module totals, upcoming dues, yearly/monthly summary, ledger, cash position
 src/routes/directory.js  Global search and the unified person-view lookup, across every module
+src/routes/attachments.js  Document attachments: upload/list/download/delete, cascade-delete on parent delete
 src/routes/backups.js    Backup list/create/restore API
 src/routes/account.js    Change username/password API
 public/                  Frontend (plain HTML/CSS/JS, no build step required)

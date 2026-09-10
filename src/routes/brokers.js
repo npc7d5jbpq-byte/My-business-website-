@@ -23,6 +23,7 @@
 const express = require('express');
 const db = require('../db');
 const { sumAmount, settledRows, pendingRows, round2 } = require('../finance');
+const { removeAttachmentsFor } = require('./attachments');
 
 const router = express.Router();
 
@@ -139,6 +140,7 @@ router.delete('/brokers/:id', (req, res) => {
   db.removeWhere('brokerCommissionPayments', (p) => dealIds.includes(p.parentId));
   db.removeWhere('brokerDeals', (d) => d.brokerId === broker.id);
   db.removeWhere('brokerAdvances', (a) => a.brokerId === broker.id);
+  removeAttachmentsFor('broker', broker.id);
   db.remove('brokers', broker.id);
   res.json({ ok: true });
 });

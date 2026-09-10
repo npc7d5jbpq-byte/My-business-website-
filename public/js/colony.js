@@ -78,15 +78,28 @@
   function renderPlots(plots) {
     const body = document.getElementById('plots-body');
     if (!plots.length) {
-      body.innerHTML = '<tr class="empty-row"><td colspan="10">No plots added yet.</td></tr>';
+      body.innerHTML = '<tr class="empty-row"><td colspan="11">No plots added yet.</td></tr>';
       return;
     }
+    // Rs./Marla comparison across the colony's plots - computed fresh from
+    // price ÷ size every time (not read back from a stored pricePerMarla,
+    // which can go stale once price is edited by hand), so an under- or
+    // over-priced plot stands out at a glance.
+    const marlaRates = plots.map((p) => pricePerMarlaOf(p, 'price')).filter((r) => r != null);
+    const avgRate = marlaRates.length ? marlaRates.reduce((s, r) => s + r, 0) / marlaRates.length : null;
     body.innerHTML = plots.map((p) => {
       const due = nextDueOf(p.payments);
       const dueCell = due
         ? `${formatCurrency(due.amount)}<div style="font-size:11px; ${due.overdue ? 'color:var(--danger); font-weight:700;' : 'color:var(--text-muted);'}">${formatDate(due.dueDate)}${due.overdue ? ' · OVERDUE' : ''}</div>`
         : '<span class="text-muted">—</span>';
       const cancelled = p.status === 'cancelled';
+      const rate = pricePerMarlaOf(p, 'price');
+      let rateCell = '<span class="text-muted">—</span>';
+      if (rate != null) {
+        const offPct = avgRate ? Math.round(((rate - avgRate) / avgRate) * 100) : 0;
+        const flagColor = Math.abs(offPct) >= 10 ? (offPct > 0 ? 'var(--danger)' : 'var(--success)') : 'var(--text-muted)';
+        rateCell = `${formatCurrency(rate)}${Math.abs(offPct) >= 10 ? `<div style="font-size:11px; font-weight:700; color:${flagColor};">${offPct > 0 ? '▲' : '▼'} ${Math.abs(offPct)}% vs colony avg</div>` : ''}`;
+      }
       return `
       <tr style="${cancelled ? 'opacity:0.6;' : ''}">
         <td style="font-weight:700;">${escapeHtml(p.plotNumber)}</td>
@@ -94,7 +107,8 @@
         <td style="text-transform:capitalize;">${escapeHtml(CATEGORY_LABELS[p.category] || p.category || '—')}</td>
         <td>${statusBadge(p.status)}${cancelled && p.cancelReason ? `<div class="text-muted" style="font-size:11px;">${escapeHtml(p.cancelReason)}</div>` : ''}</td>
         <td>${p.buyerName ? personLink(p.buyerName) : '—'}${p.buyerPhone ? `<div class="text-muted" style="font-size:11px;">${escapeHtml(p.buyerPhone)}</div>` : ''}</td>
-        <td class="text-right num">${formatCurrency(p.price)}</td>
+        <td class="text-right num">${formatCurrency(p.price)}${p.discount ? `<div style="font-size:11px; color:var(--success);">Rs. ${formatCurrency(p.discount).replace('Rs. ', '')} discount given</div>` : ''}</td>
+        <td class="text-right num">${rateCell}</td>
         <td class="text-right num" style="color:var(--success);">${formatCurrency(p.received)}</td>
         <td class="text-right num" style="color:${!cancelled && p.remaining > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${cancelled ? '<span class="text-muted">—</span>' : formatCurrency(p.remaining)}</td>
         <td class="num">${dueCell}</td>
@@ -129,6 +143,7 @@
       ] },
       { name: 'frontFt', label: 'Front (feet)', type: 'number', step: '0.01', value: v.frontFt != null ? v.frontFt : 0 },
       { name: 'lengthFt', label: 'Length / Depth (feet)', type: 'number', step: '0.01', value: v.lengthFt != null ? v.lengthFt : 0 },
+      ...priceCalculatorFields(v),
       { name: 'price', label: 'Sale price (Rs.)', type: 'number', step: '0.01', value: v.price != null ? v.price : 0 },
       { name: 'status', label: 'Status', type: 'select', value: v.status || 'available', options: [
         { value: 'available', label: 'Available' }, { value: 'reserved', label: 'Reserved' }, { value: 'sold', label: 'Sold' },
@@ -145,10 +160,23 @@
   // the backend actually stores, and drops the helper field.
   function resolvePlotSize(values) {
     const resolved = Object.assign({}, values);
-    if (resolved.size === OTHER_SIZE) {
+    const usedOther = resolved.size === OTHER_SIZE;
+    if (usedOther) {
       resolved.size = (resolved.sizeCustom || '').trim() || OTHER_SIZE;
     }
     delete resolved.sizeCustom;
+    // If the price calculator's Size fields were filled in, they're the
+    // more authoritative, structured source for the plot's size - keep
+    // the displayed "Size" text in sync with them automatically (e.g.
+    // "5 Marla"), so it can't silently disagree with what the price/Marla
+    // figure was actually computed from. A deliberately-typed custom size
+    // (the "Other" option) always wins over this, since that's an
+    // explicit second action by whoever filled the form in.
+    const sizeValue = Number(resolved.sizeValue) || 0;
+    if (sizeValue > 0 && !usedOther) {
+      const unitLabel = { marla: 'Marla', kanal: 'Kanal', acre: 'Acre' }[resolved.sizeUnit] || 'Marla';
+      resolved.size = `${sizeValue} ${unitLabel}`;
+    }
     return resolved;
   }
 
@@ -162,6 +190,7 @@
         load();
       },
     });
+    wirePriceCalculator('price');
   });
 
   document.getElementById('plots-body').addEventListener('click', (e) => {
@@ -180,6 +209,7 @@
           load();
         },
       });
+      wirePriceCalculator('price');
     }
     // Cancel keeps the plot, its buyer info and its full payment history on
     // record (with a "Cancelled" badge, and no longer counted as a live
@@ -431,4 +461,5 @@
   }));
 
   load();
+  renderAttachmentsSection('colony-documents', 'colony', colonyId);
 })();

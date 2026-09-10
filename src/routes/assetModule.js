@@ -5,6 +5,7 @@
 const express = require('express');
 const db = require('../db');
 const { sumAmount, settledRows, pendingRows, round2 } = require('../finance');
+const { removeAttachmentsFor } = require('./attachments');
 
 function computeAssetStats(entity, payments) {
   const totalPaid = round2(sumAmount(settledRows(payments, 'paid')));
@@ -38,7 +39,7 @@ function computeAssetStats(entity, payments) {
   };
 }
 
-function createAssetRouter({ collection, paymentsCollection, entityLabel }) {
+function createAssetRouter({ type, collection, paymentsCollection, entityLabel }) {
   const router = express.Router();
 
   function withStats(entity) {
@@ -53,7 +54,7 @@ function createAssetRouter({ collection, paymentsCollection, entityLabel }) {
   });
 
   router.post('/', (req, res) => {
-    const { title, location, area, frontFt, lengthFt, purchasePrice, purchaseDate, sellerName, sellerPhone, notes } = req.body;
+    const { title, location, area, frontFt, lengthFt, sizeValue, sizeUnit, purchasePrice, purchaseDate, sellerName, sellerPhone, notes } = req.body;
     if (!title || !String(title).trim()) return res.status(400).json({ error: `${entityLabel} title/name is required.` });
     const entity = db.insert(collection, {
       title: String(title).trim(),
@@ -61,6 +62,13 @@ function createAssetRouter({ collection, paymentsCollection, entityLabel }) {
       area: area || '',
       frontFt: Number(frontFt) || 0,
       lengthFt: Number(lengthFt) || 0,
+      // The record's physical size in a structured, unit-aware form
+      // (Marla/Kanal/Acre) - separate from the free-text `area` above -
+      // used by the sale-side price calculator (pricePerMarla/discount
+      // below). Doesn't change between purchase and sale, so it's set
+      // once here rather than duplicated on the sale side.
+      sizeValue: Number(sizeValue) || 0,
+      sizeUnit: sizeUnit || 'marla',
       purchasePrice: Number(purchasePrice) || 0,
       purchaseDate: purchaseDate || '',
       sellerName: sellerName || '',
@@ -68,6 +76,8 @@ function createAssetRouter({ collection, paymentsCollection, entityLabel }) {
       status: 'owned',
       previousStatus: '',
       cancelReason: '',
+      pricePerMarla: 0,
+      discount: 0,
       salePrice: 0,
       saleDate: '',
       buyerName: '',
@@ -90,10 +100,10 @@ function createAssetRouter({ collection, paymentsCollection, entityLabel }) {
     const entity = db.get(collection, req.params.id);
     if (!entity) return res.status(404).json({ error: `${entityLabel} not found.` });
     const fields = [
-      'title', 'location', 'area', 'frontFt', 'lengthFt', 'purchasePrice', 'purchaseDate', 'sellerName', 'sellerPhone',
-      'status', 'previousStatus', 'cancelReason', 'salePrice', 'saleDate', 'buyerName', 'buyerPhone', 'notes',
+      'title', 'location', 'area', 'frontFt', 'lengthFt', 'sizeValue', 'sizeUnit', 'purchasePrice', 'purchaseDate', 'sellerName', 'sellerPhone',
+      'status', 'previousStatus', 'cancelReason', 'pricePerMarla', 'discount', 'salePrice', 'saleDate', 'buyerName', 'buyerPhone', 'notes',
     ];
-    const numeric = new Set(['purchasePrice', 'salePrice', 'frontFt', 'lengthFt']);
+    const numeric = new Set(['purchasePrice', 'salePrice', 'frontFt', 'lengthFt', 'sizeValue', 'pricePerMarla', 'discount']);
     const patch = {};
     for (const f of fields) {
       if (req.body[f] !== undefined) patch[f] = numeric.has(f) ? Number(req.body[f]) || 0 : req.body[f];
@@ -105,6 +115,7 @@ function createAssetRouter({ collection, paymentsCollection, entityLabel }) {
     const entity = db.get(collection, req.params.id);
     if (!entity) return res.status(404).json({ error: `${entityLabel} not found.` });
     db.removeWhere(paymentsCollection, (p) => p.parentId === entity.id);
+    removeAttachmentsFor(type, entity.id);
     db.remove(collection, entity.id);
     res.json({ ok: true });
   });

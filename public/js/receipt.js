@@ -69,6 +69,7 @@
         partyPhone: plot.buyerPhone || '',
         direction: 'received',
         totalPrice: Number(plot.price) || 0,
+        discount: Number(plot.discount) || 0,
         totalSettled: Number(plot.received) || 0,
         remaining: Number(plot.remaining) || 0,
         payment,
@@ -89,6 +90,7 @@
       partyPhone: (direction === 'paid' ? entity.sellerPhone : entity.buyerPhone) || '',
       direction,
       totalPrice: Number(direction === 'paid' ? entity.purchasePrice : entity.salePrice) || 0,
+      discount: direction === 'received' ? Number(entity.discount) || 0 : 0,
       totalSettled: Number(direction === 'paid' ? entity.stats.totalPaid : entity.stats.totalReceived) || 0,
       remaining: Number(direction === 'paid' ? entity.stats.totalPayable : entity.stats.totalReceivable) || 0,
       payment,
@@ -132,6 +134,8 @@
       </div>
       <hr class="r-rule" />
 
+      ${data.discount ? `<div class="r-summary-row"><span>List Price</span><span>${formatCurrency(data.totalPrice + data.discount)}</span></div>
+      <div class="r-summary-row"><span>Discount Given</span><span>- ${formatCurrency(data.discount)}</span></div>` : ''}
       <div class="r-summary-row"><span>${escapeHtml(data.priceLabel || 'Total Price')}</span><span>${formatCurrency(data.totalPrice)}</span></div>
       <div class="r-summary-row"><span>${direction === 'paid' ? 'Total Paid to Date' : 'Total Received to Date'}</span><span>${formatCurrency(data.totalSettled)}</span></div>
       <hr class="r-rule solid" />

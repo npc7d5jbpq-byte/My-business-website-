@@ -153,4 +153,5 @@
   }
 
   load();
+  renderAttachmentsSection('person-documents', 'person', name);
 })();

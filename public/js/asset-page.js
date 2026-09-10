@@ -35,7 +35,7 @@ function initAssetPage(config) {
         const s = r.stats;
         const cancelled = r.status === 'cancelled';
         const saleCell = r.status === 'sold'
-          ? `Price: ${formatCurrency(r.salePrice)}<br>Received: <span style="color:var(--success)">${formatCurrency(s.totalReceived)}</span><br>Receivable: <span style="color:${s.totalReceivable > 0 ? 'var(--danger)' : 'var(--text-muted)'}">${formatCurrency(s.totalReceivable)}</span>`
+          ? `Price: ${formatCurrency(r.salePrice)}${r.discount ? ` <span class="text-muted">(Rs. ${formatCurrency(r.discount).replace('Rs. ', '')} discount)</span>` : ''}<br>Received: <span style="color:var(--success)">${formatCurrency(s.totalReceived)}</span><br>Receivable: <span style="color:${s.totalReceivable > 0 ? 'var(--danger)' : 'var(--text-muted)'}">${formatCurrency(s.totalReceivable)}</span>`
           : (cancelled
             ? `<span class="text-muted">Sale cancelled${r.cancelReason ? ' — ' + escapeHtml(r.cancelReason) : ''}</span><br>Received: <span style="color:var(--success)">${formatCurrency(s.totalReceived)}</span>`
             : '<span class="text-muted">Not sold yet</span>');
@@ -76,6 +76,8 @@ function initAssetPage(config) {
         { name: 'area', label: 'Area / size', value: v.area },
         { name: 'frontFt', label: 'Front (feet)', type: 'number', step: '0.01', value: v.frontFt != null ? v.frontFt : 0 },
         { name: 'lengthFt', label: 'Length / Depth (feet)', type: 'number', step: '0.01', value: v.lengthFt != null ? v.lengthFt : 0 },
+        { name: 'sizeValue', label: 'Size (for price calculator, optional)', type: 'number', step: '0.01', value: v.sizeValue || '' },
+        { name: 'sizeUnit', label: 'Size Unit', type: 'select', value: v.sizeUnit || 'marla', options: SIZE_UNIT_OPTIONS },
         { name: 'purchasePrice', label: 'Purchase price (Rs.)', type: 'number', step: '0.01', value: v.purchasePrice != null ? v.purchasePrice : 0 },
         { name: 'purchaseDate', label: 'Purchase date', type: 'date', value: v.purchaseDate },
         { name: 'sellerName', label: 'Seller name', value: v.sellerName },
@@ -122,6 +124,10 @@ function initAssetPage(config) {
           title: `Mark ${config.entityNoun} as Sold`,
           submitLabel: 'Save',
           fields: [
+            { name: 'sizeValue', label: 'Size (for price calculator, optional)', type: 'number', step: '0.01', value: row.sizeValue || '' },
+            { name: 'sizeUnit', label: 'Size Unit', type: 'select', value: row.sizeUnit || 'marla', options: SIZE_UNIT_OPTIONS },
+            { name: 'pricePerMarla', label: 'Price per Marla (Rs., optional)', type: 'number', step: '0.01', value: row.pricePerMarla || '' },
+            { name: 'discount', label: 'Discount (Rs., if given)', type: 'number', step: '0.01', value: row.discount || '' },
             { name: 'salePrice', label: 'Sale price (Rs.)', type: 'number', step: '0.01', required: true, value: row.purchasePrice },
             { name: 'saleDate', label: 'Sale date', type: 'date', value: today() },
             { name: 'buyerName', label: `${config.buyerNoun} name`, required: true },
@@ -136,6 +142,7 @@ function initAssetPage(config) {
             window.location.href = `asset-detail.html?type=${encodeURIComponent(config.type)}&id=${row.id}&openPlan=1`;
           },
         });
+        wirePriceCalculator('salePrice');
       }
 
       // Cancel keeps the record, its buyer info and its full payment history

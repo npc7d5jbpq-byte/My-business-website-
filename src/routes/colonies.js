@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { sumAmount, settledRows, pendingRows, round2 } = require('../finance');
+const { removeAttachmentsFor } = require('./attachments');
 
 const router = express.Router();
 
@@ -139,6 +140,8 @@ router.delete('/colonies/:id', (req, res) => {
   db.removeWhere('plots', (p) => p.colonyId === colony.id);
   db.removeWhere('colonyMilestones', (m) => m.colonyId === colony.id);
   db.removeWhere('colonyExpenses', (e) => e.colonyId === colony.id);
+  removeAttachmentsFor('plot', plotIds);
+  removeAttachmentsFor('colony', colony.id);
   db.remove('colonies', colony.id);
   res.json({ ok: true });
 });
@@ -148,7 +151,7 @@ router.delete('/colonies/:id', (req, res) => {
 router.post('/colonies/:id/plots', (req, res) => {
   const colony = db.get('colonies', req.params.id);
   if (!colony) return res.status(404).json({ error: 'Colony not found.' });
-  const { plotNumber, size, category, frontFt, lengthFt, price, status, buyerName, buyerPhone, buyerCnic, saleDate, notes } = req.body;
+  const { plotNumber, size, category, frontFt, lengthFt, sizeValue, sizeUnit, pricePerMarla, discount, price, status, buyerName, buyerPhone, buyerCnic, saleDate, notes } = req.body;
   if (!plotNumber || !String(plotNumber).trim()) return res.status(400).json({ error: 'Plot number is required.' });
   const plot = db.insert('plots', {
     colonyId: colony.id,
@@ -157,6 +160,16 @@ router.post('/colonies/:id/plots', (req, res) => {
     category: category || 'residential',
     frontFt: Number(frontFt) || 0,
     lengthFt: Number(lengthFt) || 0,
+    // sizeValue/sizeUnit (Marla/Kanal/Acre) and pricePerMarla/discount are
+    // the inputs to the price calculator (see common.js's
+    // computeMarlaPrice) - price itself is still the number actually
+    // charged/on record, whether it was typed directly or filled in by
+    // the calculator, so every other total in the app keeps reading from
+    // one place.
+    sizeValue: Number(sizeValue) || 0,
+    sizeUnit: sizeUnit || 'marla',
+    pricePerMarla: Number(pricePerMarla) || 0,
+    discount: Number(discount) || 0,
     price: Number(price) || 0,
     status: status || 'available',
     previousStatus: '',
@@ -173,8 +186,8 @@ router.post('/colonies/:id/plots', (req, res) => {
 router.put('/plots/:id', (req, res) => {
   const plot = db.get('plots', req.params.id);
   if (!plot) return res.status(404).json({ error: 'Plot not found.' });
-  const fields = ['plotNumber', 'size', 'category', 'frontFt', 'lengthFt', 'price', 'status', 'previousStatus', 'cancelReason', 'buyerName', 'buyerPhone', 'buyerCnic', 'saleDate', 'notes'];
-  const numeric = new Set(['price', 'frontFt', 'lengthFt']);
+  const fields = ['plotNumber', 'size', 'category', 'frontFt', 'lengthFt', 'sizeValue', 'sizeUnit', 'pricePerMarla', 'discount', 'price', 'status', 'previousStatus', 'cancelReason', 'buyerName', 'buyerPhone', 'buyerCnic', 'saleDate', 'notes'];
+  const numeric = new Set(['price', 'frontFt', 'lengthFt', 'sizeValue', 'pricePerMarla', 'discount']);
   const patch = {};
   for (const f of fields) {
     if (req.body[f] !== undefined) patch[f] = numeric.has(f) ? Number(req.body[f]) || 0 : req.body[f];
@@ -186,6 +199,7 @@ router.delete('/plots/:id', (req, res) => {
   const plot = db.get('plots', req.params.id);
   if (!plot) return res.status(404).json({ error: 'Plot not found.' });
   db.removeWhere('plotPayments', (pay) => pay.parentId === plot.id);
+  removeAttachmentsFor('plot', plot.id);
   db.remove('plots', plot.id);
   res.json({ ok: true });
 });

@@ -11,6 +11,7 @@ const dashboardRouter = require('./src/routes/dashboard');
 const backupsRouter = require('./src/routes/backups');
 const accountRouter = require('./src/routes/account');
 const directoryRouter = require('./src/routes/directory');
+const { router: attachmentsRouter } = require('./src/routes/attachments');
 const { createAssetRouter } = require('./src/routes/assetModule');
 const backup = require('./src/backup');
 
@@ -64,17 +65,21 @@ function buildApp() {
   app.use('/api', requireAuth, backupsRouter);
   app.use('/api', requireAuth, accountRouter);
   app.use('/api', requireAuth, directoryRouter);
+  app.use('/api', requireAuth, attachmentsRouter);
   app.use('/api/agricultural', requireAuth, createAssetRouter({
+    type: 'agricultural',
     collection: 'agriculturalLands',
     paymentsCollection: 'agriculturalPayments',
     entityLabel: 'Agricultural land',
   }));
   app.use('/api/shops', requireAuth, createAssetRouter({
+    type: 'shops',
     collection: 'shops',
     paymentsCollection: 'shopPayments',
     entityLabel: 'Shop',
   }));
   app.use('/api/commercial', requireAuth, createAssetRouter({
+    type: 'commercial',
     collection: 'commercialLands',
     paymentsCollection: 'commercialPayments',
     entityLabel: 'Commercial land/plot',
