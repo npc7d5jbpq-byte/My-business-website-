@@ -93,7 +93,7 @@
         <td>${escapeHtml(p.size || '—')}</td>
         <td style="text-transform:capitalize;">${escapeHtml(CATEGORY_LABELS[p.category] || p.category || '—')}</td>
         <td>${statusBadge(p.status)}${cancelled && p.cancelReason ? `<div class="text-muted" style="font-size:11px;">${escapeHtml(p.cancelReason)}</div>` : ''}</td>
-        <td>${escapeHtml(p.buyerName || '—')}${p.buyerPhone ? `<div class="text-muted" style="font-size:11px;">${escapeHtml(p.buyerPhone)}</div>` : ''}</td>
+        <td>${p.buyerName ? personLink(p.buyerName) : '—'}${p.buyerPhone ? `<div class="text-muted" style="font-size:11px;">${escapeHtml(p.buyerPhone)}</div>` : ''}</td>
         <td class="text-right num">${formatCurrency(p.price)}</td>
         <td class="text-right num" style="color:var(--success);">${formatCurrency(p.received)}</td>
         <td class="text-right num" style="color:${!cancelled && p.remaining > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${cancelled ? '<span class="text-muted">—</span>' : formatCurrency(p.remaining)}</td>
@@ -345,6 +345,10 @@
       { name: 'amount', label: 'Amount (Rs.)', type: 'number', step: '0.01', required: true, value: v.amount },
       { name: 'dueDate', label: 'Due date', type: 'date', value: v.dueDate },
       { name: 'paidDate', label: 'Paid date (leave blank if not paid yet)', type: 'date', value: v.paidDate },
+      { name: 'paidThrough', label: 'Paid Through', type: 'select', value: v.paidThrough || '', options: PAID_THROUGH_OPTIONS },
+      { name: 'referenceNumber', label: 'Pay Order / Cheque Number', value: v.referenceNumber },
+      { name: 'bankName', label: 'Bank Name', value: v.bankName },
+      { name: 'paidBy', label: 'Paid By (if different from office staff)', value: v.paidBy },
       { name: 'notes', label: 'Notes', type: 'textarea', value: v.notes },
     ];
   }

@@ -542,4 +542,61 @@ router.get('/dashboard/ledger', (req, res) => {
   res.json(entries);
 });
 
+// How much money the office should actually be holding right now, broken
+// down by how it moved - plain Cash, or a Pay Order/Cheque grouped by the
+// bank it was drawn through - so the client can reconcile what's really in
+// the drawer/bank against what the records say. Every settled (already
+// happened) money movement counts, whichever module it came from; advance
+// *offsets* against a deal are excluded, same as everywhere else, since no
+// new cash actually moved then - the advance itself, when it was given,
+// is what already counted.
+router.get('/dashboard/cash-position', (req, res) => {
+  const buckets = new Map();
+  function bucketFor(paidThrough, bankName) {
+    let key;
+    let label;
+    if (paidThrough === 'cash') {
+      key = 'cash';
+      label = 'Cash';
+    } else if (paidThrough === 'pay_order' || paidThrough === 'cheque') {
+      const bank = (bankName || '').trim();
+      key = `bank:${bank.toLowerCase() || '(unnamed)'}`;
+      label = bank || 'Bank Not Specified';
+    } else {
+      key = 'unspecified';
+      label = 'Not Specified';
+    }
+    if (!buckets.has(key)) buckets.set(key, { key, label, in: 0, out: 0 });
+    return buckets.get(key);
+  }
+
+  for (const row of settledRows(db.list('plotPayments'))) {
+    bucketFor(row.paidThrough, row.bankName).in += Number(row.amount) || 0;
+  }
+  for (const row of settledRows(db.list('colonyExpenses'))) {
+    bucketFor(row.paidThrough, row.bankName).out += Number(row.amount) || 0;
+  }
+  for (const mod of ASSET_MODULES) {
+    for (const row of settledRows(db.list(mod.payments))) {
+      const b = bucketFor(row.paidThrough, row.bankName);
+      if (row.direction === 'received') b.in += Number(row.amount) || 0;
+      else b.out += Number(row.amount) || 0;
+    }
+  }
+  for (const row of settledRows(db.list('brokerCommissionPayments'))) {
+    if (row.source === 'advance') continue;
+    bucketFor(row.paidThrough, row.bankName).out += Number(row.amount) || 0;
+  }
+  for (const row of db.list('brokerAdvances')) {
+    bucketFor(row.paidThrough, row.bankName).out += Number(row.amount) || 0;
+  }
+
+  const order = { cash: 0, unspecified: 2 };
+  const rows = Array.from(buckets.values())
+    .map((b) => ({ key: b.key, label: b.label, totalIn: round2(b.in), totalOut: round2(b.out), balance: round2(b.in - b.out) }))
+    .sort((a, b) => (order[a.key] ?? 1) - (order[b.key] ?? 1) || a.label.localeCompare(b.label));
+
+  res.json({ rows });
+});
+
 module.exports = router;

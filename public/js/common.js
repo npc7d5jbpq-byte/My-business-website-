@@ -55,6 +55,16 @@ function escapeHtml(str) {
   }[c]));
 }
 
+// A clickable name -> the Unified Person View (person.html), used anywhere
+// a buyer/seller/broker name is shown so their whole history with the
+// office (across every module) is one click away. Falls back to plain
+// escaped text when there's no name to link.
+function personLink(name) {
+  const n = (name || '').trim();
+  if (!n) return escapeHtml(name || '');
+  return `<a href="person.html?name=${encodeURIComponent(n)}" class="person-link">${escapeHtml(n)}</a>`;
+}
+
 function statusBadge(status) {
   const map = {
     available: 'badge-info',
@@ -117,6 +127,10 @@ async function initShell(activeHref) {
   if (topbar) {
     topbar.innerHTML = `
       <div class="topbar-title" id="topbar-title"></div>
+      <div class="topbar-search" id="topbar-search">
+        <input type="text" id="global-search-input" placeholder="Search a name, CNIC, phone, or plot number…" autocomplete="off" />
+        <div class="search-results" id="global-search-results" hidden></div>
+      </div>
       <div class="topbar-user">
         <span>Signed in as <strong>${escapeHtml(session.username || '')}</strong></span>
         <button class="btn btn-ghost" id="logout-btn">Log out</button>
@@ -126,9 +140,70 @@ async function initShell(activeHref) {
       await apiRequest('/logout', { method: 'POST' });
       window.location.href = 'login.html';
     });
+    wireGlobalSearch();
   }
 
   return session;
+}
+
+// One search box, everywhere. Debounced so it doesn't fire an API call on
+// every keystroke, and closes on outside click / Escape / picking a result.
+function wireGlobalSearch() {
+  const input = document.getElementById('global-search-input');
+  const results = document.getElementById('global-search-results');
+  if (!input || !results) return;
+  let debounceTimer = null;
+  let requestToken = 0;
+
+  function hide() {
+    results.hidden = true;
+    results.innerHTML = '';
+  }
+
+  function render(items) {
+    if (!items.length) {
+      results.innerHTML = '<div class="search-empty">No matches. Try a different name, CNIC, phone number, or plot number.</div>';
+      results.hidden = false;
+      return;
+    }
+    results.innerHTML = items.map((r) => `
+      <a class="search-result-item" href="${r.url}">
+        <div class="sr-label">${escapeHtml(r.label)}</div>
+        ${r.sublabel ? `<div class="sr-meta">${escapeHtml(r.sublabel)}</div>` : ''}
+        <div class="sr-module">${escapeHtml(r.module)}</div>
+      </a>
+    `).join('');
+    results.hidden = false;
+  }
+
+  input.addEventListener('input', () => {
+    const q = input.value.trim();
+    clearTimeout(debounceTimer);
+    if (q.length < 2) { hide(); return; }
+    debounceTimer = setTimeout(async () => {
+      const token = ++requestToken;
+      try {
+        const data = await apiRequest(`/search?q=${encodeURIComponent(q)}`);
+        if (token !== requestToken) return; // a newer keystroke already superseded this request
+        render(data.results || []);
+      } catch (e) {
+        if (token !== requestToken) return;
+        hide();
+      }
+    }, 250);
+  });
+
+  input.addEventListener('focus', () => {
+    if (input.value.trim().length >= 2 && results.innerHTML) results.hidden = false;
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#topbar-search')) hide();
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { hide(); input.blur(); }
+  });
 }
 
 function setPageTitle(title) {

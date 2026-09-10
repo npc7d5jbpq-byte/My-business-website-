@@ -173,13 +173,14 @@ router.delete('/broker-advances/:id', (req, res) => {
 router.post('/brokers/:id/deals', (req, res) => {
   const broker = db.get('brokers', req.params.id);
   if (!broker) return res.status(404).json({ error: 'Broker not found.' });
-  const { description, dealValue, commissionAmount, dealDate, notes } = req.body;
+  const { description, dealValue, commissionPercent, commissionAmount, dealDate, notes } = req.body;
   if (!description || !String(description).trim()) return res.status(400).json({ error: 'A description of the deal is required.' });
   if (!commissionAmount || Number(commissionAmount) <= 0) return res.status(400).json({ error: 'A positive commission amount is required.' });
   const deal = db.insert('brokerDeals', {
     brokerId: broker.id,
     description: String(description).trim(),
     dealValue: Number(dealValue) || 0,
+    commissionPercent: Number(commissionPercent) || 0,
     commissionAmount: Number(commissionAmount),
     dealDate: dealDate || '',
     status: 'active',
@@ -192,8 +193,8 @@ router.post('/brokers/:id/deals', (req, res) => {
 router.put('/broker-deals/:id', (req, res) => {
   const deal = db.get('brokerDeals', req.params.id);
   if (!deal) return res.status(404).json({ error: 'Deal not found.' });
-  const fields = ['description', 'dealValue', 'commissionAmount', 'dealDate', 'status', 'cancelReason', 'notes'];
-  const numeric = new Set(['dealValue', 'commissionAmount']);
+  const fields = ['description', 'dealValue', 'commissionPercent', 'commissionAmount', 'dealDate', 'status', 'cancelReason', 'notes'];
+  const numeric = new Set(['dealValue', 'commissionPercent', 'commissionAmount']);
   const patch = {};
   for (const f of fields) {
     if (req.body[f] !== undefined) patch[f] = numeric.has(f) ? Number(req.body[f]) || 0 : req.body[f];

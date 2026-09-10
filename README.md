@@ -120,6 +120,44 @@ machine.
 - **Automatic, scheduled, multi-copy backups** — see **Data Persistence &
   Backups** below for exactly where, how often, how many, and how to
   restore.
+- **Cash Position — by payment method** — on **Reports & Ledger**, a table
+  that buckets every settled payment across the whole office (colony
+  plots, colony expenses, agricultural/shops/commercial, broker
+  commissions and advances) by how it was actually paid — **Cash**, each
+  named **bank** (from Pay Order/Cheque payments), and **Not Specified** —
+  showing total in, total out, and the running balance for each. Use it to
+  reconcile what's actually sitting in the drawer or in a bank account
+  against what the records say should be there. A broker advance offset
+  (drawing down an existing advance to settle commission) is correctly
+  excluded from this, since no new cash actually moves when that happens.
+- **Commission as a % of deal value** — a broker deal can record a
+  **Commission %** alongside its deal value, and the commission amount
+  fills itself in automatically (deal value × percent ÷ 100) as either
+  field is typed — no manual math. The amount field stays a normal,
+  directly-editable field the whole time, so a broker paid a flat rupee
+  amount instead of a percentage still works exactly as before. The
+  broker's Deals table shows the percentage under the commission amount
+  whenever one was used.
+- **Global search** — one search box at the top of every page, searching a
+  name, phone number, CNIC, or plot number across colonies, colony plots,
+  agricultural land, shops, commercial land & plots, and brokers at once.
+  Start typing (2+ characters) and matching records drop down instantly;
+  click one to go straight to its page.
+- **Full Statement printout** — beyond a single payment's receipt, every
+  plot, agricultural/shop/commercial record, and broker deal has a
+  **Print Full Statement** button that opens a full-page (A4) printout of
+  its *entire* payment history — every installment, paid and pending, with
+  due dates, paid/received dates, status, payment method, and running
+  totals — plus signature lines. For an agricultural/shop/commercial
+  record that's been both bought and resold, it prints both sides (paid to
+  the seller, received from the buyer) on the same page. Useful whenever a
+  buyer disputes how much they've actually paid so far.
+- **Unified person view** — click any buyer, seller, or broker's name
+  anywhere in the app (it's underlined) to open one page showing every
+  deal they've ever had with the office, across every module at once — a
+  colony plot they bought, agricultural land they sold to the office, a
+  broker profile, all in one place, each with a link straight to that
+  record.
 
 ## Data Persistence & Backups
 
@@ -314,12 +352,15 @@ src/finance.js           Shared money/date math (paid vs. pending, overdue, sums
 src/routes/colonies.js   Colonies, plots, milestones, development expenses
 src/routes/assetModule.js  Shared buy/sell/payments logic for the 3 modules below
 src/routes/brokers.js    Brokers, their deals, and each deal's commission payments
-src/routes/dashboard.js  Cross-module totals, upcoming dues, yearly/monthly summary, ledger
+src/routes/dashboard.js  Cross-module totals, upcoming dues, yearly/monthly summary, ledger, cash position
+src/routes/directory.js  Global search and the unified person-view lookup, across every module
 src/routes/backups.js    Backup list/create/restore API
 src/routes/account.js    Change username/password API
 public/                  Frontend (plain HTML/CSS/JS, no build step required)
 public/plot.html         A single colony plot's own dedicated page (dimensions, payments)
 public/asset-detail.html A single agricultural/shop/commercial record's own dedicated page
+public/statement.html    Full payment-history statement printout (A4) for a plot/record/deal
+public/person.html       Unified person view — every deal one person has, across every module
 public/backups.html      Backups & Restore page
 public/account.html      Account Settings (change username/password) page
 .github/workflows/       CI workflow that builds the Windows/macOS/Linux installers

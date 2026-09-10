@@ -27,7 +27,7 @@
   function renderAll() {
     const b = state.broker;
     setPageTitle(b.name);
-    document.getElementById('broker-name').textContent = b.name;
+    document.getElementById('broker-name').innerHTML = personLink(b.name);
     document.getElementById('broker-phone').textContent = b.phone || 'No phone on file';
     renderTiles(b.stats);
     renderAdvances(b.advances, b.stats);
@@ -134,7 +134,7 @@
           ${cancelled && d.cancelReason ? `<div class="text-muted" style="font-size:11px; font-weight:400;">Reason: ${escapeHtml(d.cancelReason)}</div>` : ''}
         </td>
         <td class="text-right num">${d.dealValue ? formatCurrency(d.dealValue) : '<span class="text-muted">—</span>'}</td>
-        <td class="text-right num" style="font-weight:700;">${cancelled ? '<span class="text-muted">Void</span>' : formatCurrency(d.stats.commissionAmount)}</td>
+        <td class="text-right num" style="font-weight:700;">${cancelled ? '<span class="text-muted">Void</span>' : `${formatCurrency(d.stats.commissionAmount)}${d.commissionPercent ? `<div style="font-size:11px; font-weight:400; color:var(--text-muted);">${d.commissionPercent}%</div>` : ''}`}</td>
         <td class="text-right num" style="color:var(--success);">${formatCurrency(d.stats.totalPaid)}</td>
         <td class="text-right num" style="color:${!cancelled && d.stats.remaining > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${cancelled ? '<span class="text-muted">—</span>' : formatCurrency(d.stats.remaining)}</td>
         <td class="num">${dueCell}</td>
@@ -159,10 +159,30 @@
     return [
       { name: 'description', label: 'Deal description', required: true, placeholder: 'e.g. Sold Plot RT-5, Gulberg Colony to Ahmed Khan', value: v.description },
       { name: 'dealValue', label: 'Deal value (Rs., optional reference)', type: 'number', step: '0.01', value: v.dealValue != null ? v.dealValue : 0 },
+      { name: 'commissionPercent', label: 'Commission % (optional — auto-fills the amount below)', type: 'number', step: '0.01', value: v.commissionPercent != null && v.commissionPercent !== 0 ? v.commissionPercent : '' },
       { name: 'commissionAmount', label: 'Commission amount (Rs.)', type: 'number', step: '0.01', required: true, value: v.commissionAmount != null ? v.commissionAmount : 0 },
       { name: 'dealDate', label: 'Deal date', type: 'date', value: v.dealDate || today() },
       { name: 'notes', label: 'Notes', type: 'textarea', value: v.notes },
     ];
+  }
+
+  // Wires "Deal value" x "Commission %" -> auto-fills "Commission amount"
+  // whenever either changes, as long as both have a positive value. The
+  // amount field stays a normal editable input the whole time - typing into
+  // it directly still works and just stops being overwritten until the
+  // value% or deal value changes again.
+  function wireCommissionAutoCalc() {
+    const form = document.getElementById('modal-form');
+    if (!form || !form.elements.dealValue || !form.elements.commissionPercent) return;
+    const recalc = () => {
+      const dealValue = Number(form.elements.dealValue.value) || 0;
+      const percent = Number(form.elements.commissionPercent.value) || 0;
+      if (dealValue > 0 && percent > 0) {
+        form.elements.commissionAmount.value = Math.round(dealValue * percent / 100 * 100) / 100;
+      }
+    };
+    form.elements.dealValue.addEventListener('input', recalc);
+    form.elements.commissionPercent.addEventListener('input', recalc);
   }
 
   document.getElementById('add-deal-btn').addEventListener('click', () => {
@@ -175,6 +195,7 @@
         load();
       },
     });
+    wireCommissionAutoCalc();
   });
 
   document.getElementById('deals-body').addEventListener('click', (e) => {
@@ -195,6 +216,7 @@
           load();
         },
       });
+      wireCommissionAutoCalc();
     }
     // Cancel keeps the deal on record (with a "Cancelled" badge, and no
     // longer counted as owed commission) instead of erasing that it ever
@@ -287,6 +309,9 @@
     `;
 
     return `
+      <div class="modal-actions" style="justify-content:flex-start; margin-bottom:12px;">
+        <button type="button" class="btn btn-ghost btn-sm" data-print-statement>🖨 Print Full Statement</button>
+      </div>
       <div class="table-wrap" style="margin-bottom:18px;">
         <table>
           <thead><tr><th class="text-right">Amount</th><th>Due date</th><th>Paid date</th><th>Paid Through</th><th>Notes</th><th></th></tr></thead>
@@ -389,6 +414,11 @@
       });
       const openPlanBtn = root.querySelector('[data-open-plan]');
       if (openPlanBtn) openPlanBtn.addEventListener('click', () => openDealInstallmentPlanModal(dealId));
+      const printStatementBtn = root.querySelector('[data-print-statement]');
+      if (printStatementBtn) printStatementBtn.addEventListener('click', () => {
+        const url = `statement.html?apiBase=/brokers&brokerId=${encodeURIComponent(brokerId)}&dealId=${encodeURIComponent(dealId)}`;
+        window.open(url, '_blank');
+      });
       root.querySelectorAll('[data-print]').forEach((btn) => {
         btn.addEventListener('click', () => {
           const url = `receipt.html?apiBase=/brokers&brokerId=${encodeURIComponent(brokerId)}&dealId=${encodeURIComponent(dealId)}&paymentId=${encodeURIComponent(btn.dataset.print)}`;

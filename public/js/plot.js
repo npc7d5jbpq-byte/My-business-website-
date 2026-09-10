@@ -73,7 +73,7 @@
       <div class="card entrance" style="animation-delay:260ms;">
         <div style="font-weight:700; margin-bottom:10px;">Owner / Buyer</div>
         <div style="font-size:13px; line-height:1.9;">
-          <div>${escapeHtml(p.buyerName || 'Not set')}</div>
+          <div>${p.buyerName ? personLink(p.buyerName) : 'Not set'}</div>
           ${p.buyerPhone ? `<div class="text-muted">${escapeHtml(p.buyerPhone)}</div>` : ''}
           ${p.buyerCnic ? `<div class="text-muted">CNIC: ${escapeHtml(p.buyerCnic)}</div>` : ''}
           <div class="text-muted">Status: ${statusBadge(p.status)}</div>
@@ -318,6 +318,11 @@
     delete resolved.sizeCustom;
     return resolved;
   }
+
+  document.getElementById('print-statement-btn').addEventListener('click', () => {
+    const url = `statement.html?apiBase=/colonies&colonyId=${encodeURIComponent(colonyId)}&plotId=${encodeURIComponent(plotId)}`;
+    window.open(url, '_blank');
+  });
 
   document.getElementById('edit-plot-btn').addEventListener('click', () => {
     openFormModal({

@@ -263,7 +263,7 @@ router.delete('/milestones/:id', (req, res) => {
 router.post('/colonies/:id/expenses', (req, res) => {
   const colony = db.get('colonies', req.params.id);
   if (!colony) return res.status(404).json({ error: 'Colony not found.' });
-  const { title, category, amount, dueDate, paidDate, notes } = req.body;
+  const { title, category, amount, dueDate, paidDate, paidThrough, referenceNumber, bankName, paidBy, notes } = req.body;
   if (!title || !String(title).trim()) return res.status(400).json({ error: 'Title is required.' });
   if (!amount || Number(amount) <= 0) return res.status(400).json({ error: 'A positive amount is required.' });
   const expense = db.insert('colonyExpenses', {
@@ -273,6 +273,10 @@ router.post('/colonies/:id/expenses', (req, res) => {
     amount: Number(amount),
     dueDate: dueDate || '',
     paidDate: paidDate || '',
+    paidThrough: paidThrough || '',
+    referenceNumber: referenceNumber || '',
+    bankName: bankName || '',
+    paidBy: paidBy || '',
     notes: notes || '',
   });
   res.status(201).json(expense);
@@ -282,7 +286,7 @@ router.put('/expenses/:id', (req, res) => {
   const row = db.get('colonyExpenses', req.params.id);
   if (!row) return res.status(404).json({ error: 'Expense not found.' });
   const patch = {};
-  for (const f of ['title', 'category', 'amount', 'dueDate', 'paidDate', 'notes']) {
+  for (const f of ['title', 'category', 'amount', 'dueDate', 'paidDate', 'paidThrough', 'referenceNumber', 'bankName', 'paidBy', 'notes']) {
     if (req.body[f] !== undefined) patch[f] = f === 'amount' ? Number(req.body[f]) || 0 : req.body[f];
   }
   res.json(db.update('colonyExpenses', req.params.id, patch));

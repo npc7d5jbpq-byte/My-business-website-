@@ -69,7 +69,7 @@
       <div class="card entrance" style="animation-delay:320ms;">
         <div style="font-weight:700; margin-bottom:10px;">${escapeHtml(config.buyerNoun)}${cancelled ? ' <span class="badge badge-danger">Sale Cancelled</span>' : ''}</div>
         <div style="font-size:13px; line-height:1.9;">
-          <div>${escapeHtml(r.buyerName || 'Not set')}</div>
+          <div>${r.buyerName ? personLink(r.buyerName) : 'Not set'}</div>
           ${r.buyerPhone ? `<div class="text-muted">${escapeHtml(r.buyerPhone)}</div>` : ''}
           <div class="text-muted">Sale price: ${formatCurrency(r.salePrice)}</div>
           <div class="text-muted">Received so far: ${formatCurrency(s.totalReceived)}</div>
@@ -84,7 +84,7 @@
       <div class="card entrance" style="animation-delay:320ms;">
         <div style="font-weight:700; margin-bottom:10px;">Seller</div>
         <div style="font-size:13px; line-height:1.9;">
-          <div>${escapeHtml(r.sellerName || 'Not set')}</div>
+          <div>${r.sellerName ? personLink(r.sellerName) : 'Not set'}</div>
           ${r.sellerPhone ? `<div class="text-muted">${escapeHtml(r.sellerPhone)}</div>` : ''}
         </div>
       </div>`;
@@ -324,6 +324,11 @@
       { name: 'notes', label: 'Notes', type: 'textarea', value: v.notes },
     ];
   }
+
+  document.getElementById('print-statement-btn').addEventListener('click', () => {
+    const url = `statement.html?apiBase=${encodeURIComponent(config.apiBase)}&entityId=${encodeURIComponent(id)}`;
+    window.open(url, '_blank');
+  });
 
   document.getElementById('edit-entity-btn').addEventListener('click', () => {
     openFormModal({

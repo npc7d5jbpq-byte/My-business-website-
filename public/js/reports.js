@@ -9,23 +9,52 @@
   let currentFilter = 'all';
 
   document.getElementById('growth-tiles').innerHTML = skeletonCards(2);
+  document.getElementById('cash-position-body').innerHTML = skeletonRows(2, 4);
   document.getElementById('yearly-body').innerHTML = skeletonRows(2, 5);
   document.getElementById('monthly-body').innerHTML = skeletonRows(3, 5);
   document.getElementById('ledger-body').innerHTML = skeletonRows(5, 5);
 
   try {
-    const [yearly, monthly, ledgerData] = await Promise.all([
+    const [yearly, monthly, ledgerData, cashPosition] = await Promise.all([
       apiRequest('/dashboard/yearly'),
       apiRequest('/dashboard/monthly'),
       apiRequest('/dashboard/ledger'),
+      apiRequest('/dashboard/cash-position'),
     ]);
     renderGrowthTiles(yearly, monthly);
+    renderCashPosition(cashPosition.rows);
     renderYearly(yearly);
     renderMonthly(monthly);
     ledger = ledgerData;
     renderLedger();
   } catch (err) {
     showBanner(err.message);
+  }
+
+  function renderCashPosition(rows) {
+    const body = document.getElementById('cash-position-body');
+    if (!rows.length) {
+      body.innerHTML = '<tr class="empty-row"><td colspan="4">No settled transactions recorded yet.</td></tr>';
+      return;
+    }
+    body.innerHTML = rows.map((r) => `
+      <tr>
+        <td style="font-weight:700;">${escapeHtml(r.label)}</td>
+        <td class="text-right num" style="color:var(--success);">${formatCurrency(r.totalIn)}</td>
+        <td class="text-right num" style="color:var(--danger);">${formatCurrency(r.totalOut)}</td>
+        <td class="text-right num" style="font-weight:700; color:${r.balance >= 0 ? 'var(--success)' : 'var(--danger)'};">${formatCurrency(r.balance)}</td>
+      </tr>
+    `).join('');
+    const totalBalance = round2(rows.reduce((sum, r) => sum + r.balance, 0));
+    body.innerHTML += `
+      <tr style="border-top:2px solid var(--border);">
+        <td style="font-weight:700;">Total</td>
+        <td class="text-right num" style="font-weight:700; color:var(--success);">${formatCurrency(round2(rows.reduce((sum, r) => sum + r.totalIn, 0)))}</td>
+        <td class="text-right num" style="font-weight:700; color:var(--danger);">${formatCurrency(round2(rows.reduce((sum, r) => sum + r.totalOut, 0)))}</td>
+        <td class="text-right num" style="font-weight:700; color:${totalBalance >= 0 ? 'var(--success)' : 'var(--danger)'};">${formatCurrency(totalBalance)}</td>
+      </tr>
+    `;
+    staggerRows(body, { stepMs: 40 });
   }
 
   // Returns { diff, pctLabel, up } comparing curr to prev, or null if there's

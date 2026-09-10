@@ -10,6 +10,7 @@ const { router: brokersRouter } = require('./src/routes/brokers');
 const dashboardRouter = require('./src/routes/dashboard');
 const backupsRouter = require('./src/routes/backups');
 const accountRouter = require('./src/routes/account');
+const directoryRouter = require('./src/routes/directory');
 const { createAssetRouter } = require('./src/routes/assetModule');
 const backup = require('./src/backup');
 
@@ -62,6 +63,7 @@ function buildApp() {
   app.use('/api', requireAuth, dashboardRouter);
   app.use('/api', requireAuth, backupsRouter);
   app.use('/api', requireAuth, accountRouter);
+  app.use('/api', requireAuth, directoryRouter);
   app.use('/api/agricultural', requireAuth, createAssetRouter({
     collection: 'agriculturalLands',
     paymentsCollection: 'agriculturalPayments',
