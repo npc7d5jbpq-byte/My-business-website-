@@ -369,12 +369,50 @@ function addMonths(date, months) {
   return d;
 }
 
+// Every still-pending amount the business expects to actually RECEIVE - a
+// colony plot buyer's next installment, or a pending 'received' payment on
+// an already-sold agricultural/shop/commercial record. A cancelled sale's
+// pending installments are excluded (voided, no longer actually expected -
+// see the Cancel Sale action), same as they're excluded from /dashboard/upcoming.
+function upcomingReceivableRows() {
+  const rows = [];
+  for (const colony of db.list('colonies')) {
+    const plots = db.list('plots', (p) => p.colonyId === colony.id && p.status !== 'cancelled');
+    const plotIds = new Set(plots.map((p) => p.id));
+    for (const row of pendingRows(db.list('plotPayments', (p) => plotIds.has(p.parentId)))) {
+      rows.push({ amount: Number(row.amount) || 0, dueDate: row.dueDate });
+    }
+  }
+  for (const mod of ASSET_MODULES) {
+    const entityIds = new Set(db.list(mod.key, (e) => e.status !== 'cancelled').map((e) => e.id));
+    for (const row of pendingRows(db.list(mod.payments, (p) => entityIds.has(p.parentId)), 'received')) {
+      rows.push({ amount: Number(row.amount) || 0, dueDate: row.dueDate });
+    }
+  }
+  return rows;
+}
+
+// Buckets `rows` (each { amount, dueDate }) into cumulative "due within"
+// horizons from today - shared by the payables and receivables horizon
+// endpoints below. Anything already overdue, or with no due date set at
+// all, is treated as needed/expected right away and so counts toward
+// every horizon.
+function computeHorizons(rows, today, horizonDefs) {
+  return horizonDefs.map((h) => ({
+    key: h.key,
+    label: h.label,
+    amount: round2(
+      rows
+        .filter((r) => !r.dueDate || new Date(r.dueDate) <= h.end)
+        .reduce((sum, r) => sum + r.amount, 0)
+    ),
+  }));
+}
+
 // How much money needs to be ready within each upcoming horizon - a
 // cumulative "cash runway" view (Next 3 Months already includes everything
 // due within Next 1 Month, and so on), so the client can see at a glance
-// what needs to be set aside over different planning windows. Anything
-// already overdue, or with no due date set at all, is treated as needed
-// right away and so counts toward every horizon.
+// what needs to be set aside over different planning windows.
 router.get('/dashboard/payables-horizon', (req, res) => {
   const rows = upcomingPayableRows();
   const today = startOfToday();
@@ -387,17 +425,29 @@ router.get('/dashboard/payables-horizon', (req, res) => {
     { key: 'month15', label: 'Next 15 Months', end: addMonths(today, 15) },
     { key: 'month18', label: 'Next 18 Months', end: addMonths(today, 18) },
   ];
-  const horizons = horizonDefs.map((h) => ({
-    key: h.key,
-    label: h.label,
-    amount: round2(
-      rows
-        .filter((r) => !r.dueDate || new Date(r.dueDate) <= h.end)
-        .reduce((sum, r) => sum + r.amount, 0)
-    ),
-  }));
+  const horizons = computeHorizons(rows, today, horizonDefs);
   const totalPayableExcludingCommission = round2(rows.reduce((sum, r) => sum + r.amount, 0));
   res.json({ excludesBrokerCommission: true, horizons, totalPayableExcludingCommission });
+});
+
+// Same idea, mirrored for money coming IN: how much is expected to actually
+// be received within each upcoming horizon.
+router.get('/dashboard/receivables-horizon', (req, res) => {
+  const rows = upcomingReceivableRows();
+  const today = startOfToday();
+  const horizonDefs = [
+    { key: 'days15', label: 'Next 15 Days', end: addDays(today, 15) },
+    { key: 'month1', label: 'Next 1 Month', end: addMonths(today, 1) },
+    { key: 'month3', label: 'Next 3 Months', end: addMonths(today, 3) },
+    { key: 'month6', label: 'Next 6 Months', end: addMonths(today, 6) },
+    { key: 'month9', label: 'Next 9 Months', end: addMonths(today, 9) },
+    { key: 'year1', label: 'Next 1 Year', end: addMonths(today, 12) },
+    { key: 'month15', label: 'Next 15 Months', end: addMonths(today, 15) },
+    { key: 'month18', label: 'Next 18 Months', end: addMonths(today, 18) },
+  ];
+  const horizons = computeHorizons(rows, today, horizonDefs);
+  const totalReceivable = round2(rows.reduce((sum, r) => sum + r.amount, 0));
+  res.json({ horizons, totalReceivable });
 });
 
 // Every settled (actually happened) transaction across every module, for

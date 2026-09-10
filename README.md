@@ -91,12 +91,16 @@ machine.
   reactivated again if that was a mistake.
 - **Dashboard** — total money in, total money out, total receivable, total
   payable, net profit, every upcoming or overdue payment/task across the
-  whole business (including broker commissions) in one list, and a
+  whole business (including broker commissions) in one list, a
   **"Money to Be Given — Upcoming"** breakdown showing how much needs to be
   paid out within the next 15 days / 1 / 3 / 6 / 15 / 18 months and the
   next year (each figure cumulative — deliberately **excluding broker
   commissions**, which are tracked on their own separate schedule under
-  Brokers Commission instead).
+  Brokers Commission instead), and the mirror image, **"Money to Be
+  Received — Upcoming"**, showing every colony plot installment and
+  asset-sale payment still expected from a buyer within the next 15 days /
+  1 / 3 / 6 / 9 months / 1 year / 15 / 18 months (cancelled sales excluded,
+  same cumulative-per-horizon idea).
 - **Reports & Ledger** — a "Growth at a Glance" comparison of this month vs
   last month and this year vs last year, a full year-by-year and
   month-by-month money in/out/net breakdown (each row showing its growth

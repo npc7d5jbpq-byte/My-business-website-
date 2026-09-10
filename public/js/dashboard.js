@@ -8,16 +8,19 @@
   document.getElementById('overview-tiles').innerHTML = skeletonCards(5);
   document.getElementById('module-tiles').innerHTML = skeletonCards(4);
   document.getElementById('payables-horizon-tiles').innerHTML = skeletonCards(7);
+  document.getElementById('receivables-horizon-tiles').innerHTML = skeletonCards(8);
   document.getElementById('upcoming-body').innerHTML = skeletonRows(4, 6);
 
   try {
-    const [overview, upcoming, payablesHorizon] = await Promise.all([
+    const [overview, upcoming, payablesHorizon, receivablesHorizon] = await Promise.all([
       apiRequest('/dashboard'),
       apiRequest('/dashboard/upcoming'),
       apiRequest('/dashboard/payables-horizon'),
+      apiRequest('/dashboard/receivables-horizon'),
     ]);
     renderOverview(overview);
     renderPayablesHorizon(payablesHorizon);
+    renderReceivablesHorizon(receivablesHorizon);
     renderUpcoming(upcoming);
   } catch (err) {
     showBanner(err.message);
@@ -33,6 +36,21 @@
         <span class="label">${escapeHtml(h.label)}</span>
         <span class="value" data-countup="${h.amount}">Rs. 0</span>
         <span class="sub">To be given, excl. commissions</span>
+      </div>
+    `).join('');
+    container.querySelectorAll('[data-countup]').forEach((el) => {
+      animateCountUp(el, Number(el.dataset.countup), { duration: 650 });
+    });
+  }
+
+  // The mirror image - how much is expected to actually come IN, by when.
+  function renderReceivablesHorizon(data) {
+    const container = document.getElementById('receivables-horizon-tiles');
+    container.innerHTML = data.horizons.map((h, i) => `
+      <div class="card stat-tile accent-success entrance" style="animation-delay:${i * 55}ms">
+        <span class="label">${escapeHtml(h.label)}</span>
+        <span class="value" data-countup="${h.amount}">Rs. 0</span>
+        <span class="sub">To be received</span>
       </div>
     `).join('');
     container.querySelectorAll('[data-countup]').forEach((el) => {
