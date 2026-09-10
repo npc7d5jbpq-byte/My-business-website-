@@ -3,6 +3,7 @@ const db = require('../db');
 const { sumAmount, settledRows, pendingRows, isOverdue, round2 } = require('../finance');
 const { computeColonyStats } = require('./colonies');
 const { computeAssetStats } = require('./assetModule');
+const { computeBrokerStats } = require('./brokers');
 
 const router = express.Router();
 
@@ -77,9 +78,34 @@ function colonyModuleTotals() {
   };
 }
 
+// Commissions owed to brokers are a real cost of doing the deal - committed
+// the moment the deal is logged, whichever schedule it's actually paid on -
+// so the full commission (not just what's been paid so far) counts against
+// net profit, the same way an asset module's purchase price does.
+function brokerModuleTotals() {
+  const brokers = db.list('brokers');
+  let totalCommission = 0;
+  let totalPaid = 0;
+  let totalPending = 0;
+  for (const broker of brokers) {
+    const stats = computeBrokerStats(broker);
+    totalCommission += stats.totalCommission;
+    totalPaid += stats.totalPaid;
+    totalPending += stats.totalPending;
+  }
+  return {
+    label: 'Brokers Commission',
+    count: brokers.length,
+    totalCommission: round2(totalCommission),
+    totalPaid: round2(totalPaid),
+    totalPending: round2(totalPending),
+  };
+}
+
 router.get('/dashboard', (req, res) => {
   const colonySummary = colonyModuleTotals();
   const assetSummaries = ASSET_MODULES.map(assetModuleTotals);
+  const brokerSummary = brokerModuleTotals();
 
   const totalMoneyIn = round2(
     colonySummary.totalReceived + assetSummaries.reduce((s, m) => s + m.totalReceived, 0)
@@ -87,22 +113,26 @@ router.get('/dashboard', (req, res) => {
   const totalMoneyOut = round2(
     colonySummary.totalExpensesPaid +
       colonySummary.acquisitionCost +
-      assetSummaries.reduce((s, m) => s + m.totalPaid, 0)
+      assetSummaries.reduce((s, m) => s + m.totalPaid, 0) +
+      brokerSummary.totalPaid
   );
   const totalReceivable = round2(
     colonySummary.totalReceivable + assetSummaries.reduce((s, m) => s + m.totalReceivable, 0)
   );
   const totalPayable = round2(
-    colonySummary.totalExpensesPending + assetSummaries.reduce((s, m) => s + m.totalPayable, 0)
+    colonySummary.totalExpensesPending +
+      assetSummaries.reduce((s, m) => s + m.totalPayable, 0) +
+      brokerSummary.totalPending
   );
   const netProfit = round2(
-    colonySummary.cashProfit + assetSummaries.reduce((s, m) => s + m.profit, 0)
+    colonySummary.cashProfit + assetSummaries.reduce((s, m) => s + m.profit, 0) - brokerSummary.totalCommission
   );
 
   res.json({
     totals: { totalMoneyIn, totalMoneyOut, totalReceivable, totalPayable, netProfit },
     colonySummary,
     assetSummaries,
+    brokerSummary,
   });
 });
 
@@ -173,11 +203,53 @@ router.get('/dashboard/upcoming', (req, res) => {
     }
   }
 
+  for (const broker of db.list('brokers')) {
+    const deals = db.list('brokerDeals', (d) => d.brokerId === broker.id);
+    const dealById = new Map(deals.map((d) => [d.id, d]));
+    const dealIds = new Set(deals.map((d) => d.id));
+    for (const row of pendingRows(db.list('brokerCommissionPayments', (p) => dealIds.has(p.parentId)))) {
+      const deal = dealById.get(row.parentId);
+      items.push({
+        module: 'Brokers Commission',
+        context: `${broker.name} - ${deal ? deal.description : ''}`,
+        person: broker.name,
+        amount: row.amount,
+        dueDate: row.dueDate,
+        direction: 'paid',
+        overdue: isOverdue(row),
+        notes: row.notes,
+      });
+    }
+  }
+
   items.sort((a, b) => new Date(a.dueDate || 0) - new Date(b.dueDate || 0));
   res.json(items);
 });
 
-// Money in / out / profit grouped by calendar year, across every module.
+// Every settled money movement across every module, reduced to just
+// { date, amount, direction ('in'|'out') } - the common shape the yearly
+// and monthly summaries both bucket from, so adding a new module (like
+// brokers) only means adding it here once.
+function collectMoneyFlows() {
+  const flows = [];
+  for (const row of settledRows(db.list('plotPayments'))) {
+    flows.push({ date: row.paidDate, amount: Number(row.amount) || 0, direction: 'in' });
+  }
+  for (const row of settledRows(db.list('colonyExpenses'))) {
+    flows.push({ date: row.paidDate, amount: Number(row.amount) || 0, direction: 'out' });
+  }
+  for (const mod of ASSET_MODULES) {
+    for (const row of settledRows(db.list(mod.payments))) {
+      flows.push({ date: row.paidDate, amount: Number(row.amount) || 0, direction: row.direction === 'received' ? 'in' : 'out' });
+    }
+  }
+  for (const row of settledRows(db.list('brokerCommissionPayments'))) {
+    flows.push({ date: row.paidDate, amount: Number(row.amount) || 0, direction: 'out' });
+  }
+  return flows;
+}
+
+// Money in / out / net grouped by calendar year, across every module.
 router.get('/dashboard/yearly', (req, res) => {
   const years = {};
   function bucket(year) {
@@ -190,26 +262,48 @@ router.get('/dashboard/yearly', (req, res) => {
     return Number.isFinite(y) ? y : null;
   }
 
-  for (const row of settledRows(db.list('plotPayments'))) {
-    const y = yearOf(row.paidDate);
-    if (y) bucket(y).moneyIn += Number(row.amount) || 0;
-  }
-  for (const row of settledRows(db.list('colonyExpenses'))) {
-    const y = yearOf(row.paidDate);
-    if (y) bucket(y).moneyOut += Number(row.amount) || 0;
-  }
-  for (const mod of ASSET_MODULES) {
-    for (const row of settledRows(db.list(mod.payments))) {
-      const y = yearOf(row.paidDate);
-      if (!y) continue;
-      if (row.direction === 'received') bucket(y).moneyIn += Number(row.amount) || 0;
-      else bucket(y).moneyOut += Number(row.amount) || 0;
-    }
+  for (const flow of collectMoneyFlows()) {
+    const y = yearOf(flow.date);
+    if (!y) continue;
+    if (flow.direction === 'in') bucket(y).moneyIn += flow.amount;
+    else bucket(y).moneyOut += flow.amount;
   }
 
   const result = Object.values(years)
     .map((b) => ({ year: b.year, moneyIn: round2(b.moneyIn), moneyOut: round2(b.moneyOut), net: round2(b.moneyIn - b.moneyOut) }))
     .sort((a, b) => a.year - b.year);
+  res.json(result);
+});
+
+// Money in / out / net grouped by calendar month (across every year there's
+// data for) - the finer-grained series the Reports page uses to compare
+// month-over-month and year-over-year growth, since a single yearly number
+// hides whether a business is actually speeding up or slowing down.
+router.get('/dashboard/monthly', (req, res) => {
+  const months = {};
+  function bucket(year, month) {
+    const key = `${year}-${String(month).padStart(2, '0')}`;
+    if (!months[key]) months[key] = { year, month, moneyIn: 0, moneyOut: 0 };
+    return months[key];
+  }
+  function monthOf(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    if (Number.isNaN(d.getTime())) return null;
+    return { year: d.getFullYear(), month: d.getMonth() + 1 };
+  }
+
+  for (const flow of collectMoneyFlows()) {
+    const mo = monthOf(flow.date);
+    if (!mo) continue;
+    const b = bucket(mo.year, mo.month);
+    if (flow.direction === 'in') b.moneyIn += flow.amount;
+    else b.moneyOut += flow.amount;
+  }
+
+  const result = Object.values(months)
+    .map((b) => ({ year: b.year, month: b.month, moneyIn: round2(b.moneyIn), moneyOut: round2(b.moneyOut), net: round2(b.moneyIn - b.moneyOut) }))
+    .sort((a, b) => a.year - b.year || a.month - b.month);
   res.json(result);
 });
 
@@ -264,6 +358,23 @@ router.get('/dashboard/ledger', (req, res) => {
         module: mod.label,
         context: entity.title,
         direction: row.direction === 'received' ? 'in' : 'out',
+        amount: row.amount,
+        notes: row.notes,
+      });
+    }
+  }
+
+  for (const broker of db.list('brokers')) {
+    const deals = db.list('brokerDeals', (d) => d.brokerId === broker.id);
+    const dealById = new Map(deals.map((d) => [d.id, d]));
+    const dealIds = new Set(deals.map((d) => d.id));
+    for (const row of settledRows(db.list('brokerCommissionPayments', (p) => dealIds.has(p.parentId)))) {
+      const deal = dealById.get(row.parentId);
+      entries.push({
+        date: row.paidDate,
+        module: 'Brokers Commission',
+        context: `${broker.name} - ${deal ? deal.description : ''}`,
+        direction: 'out',
         amount: row.amount,
         notes: row.notes,
       });

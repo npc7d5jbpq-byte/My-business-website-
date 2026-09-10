@@ -64,6 +64,16 @@
           ['Profit on sold', formatCurrency(m.profit)],
         ],
       })),
+      {
+        title: 'Brokers Commission',
+        href: 'brokers.html',
+        lines: [
+          [`${data.brokerSummary.count} brokers`, ''],
+          ['Total commission', formatCurrency(data.brokerSummary.totalCommission)],
+          ['Paid so far', formatCurrency(data.brokerSummary.totalPaid)],
+          ['Still to be given', formatCurrency(data.brokerSummary.totalPending)],
+        ],
+      },
     ];
 
     document.getElementById('module-tiles').innerHTML = modules.map((m, i) => `

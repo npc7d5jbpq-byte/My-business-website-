@@ -22,11 +22,23 @@ machine.
   bought and from whom, track every payment made to the seller (and what's
   still payable), and — once resold — track every payment received from the
   buyer (and what's still receivable), plus profit on the sale.
+- **Brokers Commission** — every broker gets their own page listing every
+  deal they earned a commission on separately, each with its own commission
+  amount and its own payment schedule (a broker is very often paid their
+  cut in installments too — some now, some after a few days, the rest
+  later — so it uses the same installment-plan builder as the other
+  modules, just counting in days instead of months). Each broker's page
+  shows their total commission across every deal, how much has actually
+  been handed to them, and how much is still owed — and it feeds into the
+  Dashboard and Reports/Ledger the same way every other module does.
 - **Dashboard** — total money in, total money out, total receivable, total
   payable, net profit, and every upcoming or overdue payment/task across the
-  whole business in one list.
-- **Reports & Ledger** — year-by-year money in/out/net, and a full
-  transaction ledger filterable by business line.
+  whole business (including broker commissions) in one list.
+- **Reports & Ledger** — a "Growth at a Glance" comparison of this month vs
+  last month and this year vs last year, a full year-by-year and
+  month-by-month money in/out/net breakdown (each row showing its growth
+  versus the previous period), and a full transaction ledger filterable by
+  business line.
 - **Printable receipts** — every payment (a plot installment, or a paid/
   received entry on agricultural land, a shop, or commercial land) has a
   **Print** button that opens a receipt formatted for a small **80mm
@@ -234,7 +246,8 @@ src/auth.js              Login check, in-app credential changes, route-protectio
 src/finance.js           Shared money/date math (paid vs. pending, overdue, sums)
 src/routes/colonies.js   Colonies, plots, milestones, development expenses
 src/routes/assetModule.js  Shared buy/sell/payments logic for the 3 modules below
-src/routes/dashboard.js  Cross-module totals, upcoming dues, yearly summary, ledger
+src/routes/brokers.js    Brokers, their deals, and each deal's commission payments
+src/routes/dashboard.js  Cross-module totals, upcoming dues, yearly/monthly summary, ledger
 src/routes/backups.js    Backup list/create/restore API
 src/routes/account.js    Change username/password API
 public/                  Frontend (plain HTML/CSS/JS, no build step required)

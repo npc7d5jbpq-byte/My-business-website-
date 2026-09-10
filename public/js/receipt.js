@@ -28,6 +28,30 @@
   // agricultural/shops/commercial records (its own payments with a
   // paid/received direction).
   async function loadReceiptData() {
+    if (apiBase === '/brokers') {
+      const brokerId = params.get('brokerId');
+      const dealId = params.get('dealId');
+      const broker = await apiRequest(`/brokers/${brokerId}`);
+      const deal = broker.deals.find((d) => d.id === dealId);
+      if (!deal) throw new Error('That deal could not be found.');
+      const payment = deal.payments.find((p) => p.id === paymentId);
+      if (!payment) throw new Error('That payment could not be found.');
+      return {
+        heading: deal.description,
+        description: deal.dealValue ? `Deal value: ${formatCurrency(deal.dealValue)}` : '',
+        sectionLabel: 'Deal',
+        priceLabel: 'Total Commission',
+        partyLabel: 'Paid To (Broker)',
+        partyName: broker.name || '—',
+        partyPhone: broker.phone || '',
+        direction: 'paid',
+        totalPrice: Number(deal.stats.commissionAmount) || 0,
+        totalSettled: Number(deal.stats.totalPaid) || 0,
+        remaining: Number(deal.stats.remaining) || 0,
+        payment,
+      };
+    }
+
     if (apiBase === '/colonies') {
       const colonyId = params.get('colonyId');
       const plotId = params.get('plotId');
@@ -94,7 +118,7 @@
       ${data.partyPhone ? `<div class="r-party-sub">${escapeHtml(data.partyPhone)}</div>` : ''}
       <hr class="r-rule" />
 
-      <div class="r-section-title">PROPERTY</div>
+      <div class="r-section-title">${escapeHtml((data.sectionLabel || 'Property').toUpperCase())}</div>
       <div class="r-party-name" style="font-size:12px;">${escapeHtml(data.heading)}</div>
       ${data.description ? `<div class="r-party-sub">${escapeHtml(data.description)}</div>` : ''}
       <hr class="r-rule" />
@@ -106,7 +130,7 @@
       </div>
       <hr class="r-rule" />
 
-      <div class="r-summary-row"><span>Total Price</span><span>${formatCurrency(data.totalPrice)}</span></div>
+      <div class="r-summary-row"><span>${escapeHtml(data.priceLabel || 'Total Price')}</span><span>${formatCurrency(data.totalPrice)}</span></div>
       <div class="r-summary-row"><span>${direction === 'paid' ? 'Total Paid to Date' : 'Total Received to Date'}</span><span>${formatCurrency(data.totalSettled)}</span></div>
       <hr class="r-rule solid" />
       <div class="r-summary-row remaining"><span>Balance Due</span><span>${formatCurrency(data.remaining)}</span></div>

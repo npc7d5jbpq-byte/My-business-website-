@@ -74,6 +74,7 @@ const NAV_ITEMS = [
   { href: 'agricultural.html', label: 'Agricultural Land', icon: '&#127807;' },
   { href: 'shops.html', label: 'Shops', icon: '&#127978;' },
   { href: 'commercial.html', label: 'Commercial Land & Plots', icon: '&#127970;' },
+  { href: 'brokers.html', label: 'Brokers Commission', icon: '&#129309;' },
   { href: 'reports.html', label: 'Reports & Ledger', icon: '&#128202;' },
   { href: 'backups.html', label: 'Backups & Restore', icon: '&#128190;' },
   { href: 'account.html', label: 'Account Settings', icon: '&#128100;' },
@@ -388,12 +389,27 @@ function addMonthsToDate(dateStr, months) {
   return d.toISOString().slice(0, 10);
 }
 
-function installmentPlanFormHtml({ includeDirection = false } = {}) {
+// Same idea as addMonthsToDate but for short intervals (a broker's
+// commission is often paid a handful of days apart, not months apart).
+function addDaysToDate(dateStr, days) {
+  const base = dateStr ? new Date(dateStr) : new Date();
+  if (Number.isNaN(base.getTime())) return '';
+  const d = new Date(base.getTime());
+  d.setDate(d.getDate() + (Number(days) || 0));
+  return d.toISOString().slice(0, 10);
+}
+
+// `unit` picks whether each installment's quick-fill is "N months after"
+// (land/plot sales - colonies, agricultural/shops/commercial) or "N days
+// after" (broker commissions, which are typically settled within days/weeks
+// of the deal rather than months).
+function installmentPlanFormHtml({ includeDirection = false, unit = 'months' } = {}) {
   const today = new Date().toISOString().slice(0, 10);
+  const unitWord = unit === 'days' ? 'days' : 'months';
   return `
     <p class="text-muted" style="margin:0 0 16px; font-size:12.5px; line-height:1.6;">
-      Set the upfront/bayana amount, then add each remaining installment with its own amount -
-      type how many months after the upfront it's due and the date fills in for you, or just pick
+      Set the upfront amount, then add each remaining installment with its own amount -
+      type how many ${unitWord} after the upfront it's due and the date fills in for you, or just pick
       a date directly.
     </p>
     ${includeDirection ? `
@@ -419,34 +435,37 @@ function installmentPlanFormHtml({ includeDirection = false } = {}) {
   `;
 }
 
-function installmentRowHtml() {
+function installmentRowHtml(unit = 'months') {
+  const unitLabel = unit === 'days' ? 'After (days)' : 'After (months)';
   return `
     <div class="installment-row" data-installment-row style="display:grid; grid-template-columns:1.2fr 1fr 1.2fr auto; gap:8px; margin-bottom:8px; align-items:end;">
       <label class="field" style="margin:0;"><span>Amount (Rs.)</span><input type="number" step="0.01" class="inst-amount" placeholder="e.g. 30" /></label>
-      <label class="field" style="margin:0;"><span>After (months)</span><input type="number" min="0" step="1" class="inst-months" placeholder="e.g. 1" /></label>
+      <label class="field" style="margin:0;"><span>${unitLabel}</span><input type="number" min="0" step="1" class="inst-months" placeholder="e.g. 1" /></label>
       <label class="field" style="margin:0;"><span>Due date</span><input type="date" class="inst-duedate" /></label>
       <button type="button" class="btn btn-ghost btn-sm" data-remove-row title="Remove">&times;</button>
     </div>
   `;
 }
 
-// Wires up "+ Add Installment" / remove-row / months-after-auto-fill
-// behaviour for a plan form already inserted into `root`. Starts with two
-// rows pre-added, since a plan is rarely just one installment.
-function initInstallmentPlanRows(root) {
+// Wires up "+ Add Installment" / remove-row / auto-fill-the-date behaviour
+// for a plan form already inserted into `root`. Starts with two rows
+// pre-added, since a plan is rarely just one installment. `unit` matches
+// whatever was passed to installmentPlanFormHtml (months or days).
+function initInstallmentPlanRows(root, unit = 'months') {
   const rowsContainer = root.querySelector('[data-installment-rows]');
   const upfrontDateInput = root.querySelector('[name=planUpfrontDate]');
+  const addToDate = unit === 'days' ? addDaysToDate : addMonthsToDate;
 
   function addRow() {
     const wrapper = document.createElement('div');
-    wrapper.innerHTML = installmentRowHtml();
+    wrapper.innerHTML = installmentRowHtml(unit);
     const rowEl = wrapper.firstElementChild;
     rowsContainer.appendChild(rowEl);
     const monthsInput = rowEl.querySelector('.inst-months');
     const dueDateInput = rowEl.querySelector('.inst-duedate');
     monthsInput.addEventListener('input', () => {
       if (monthsInput.value !== '') {
-        dueDateInput.value = addMonthsToDate(upfrontDateInput.value, monthsInput.value);
+        dueDateInput.value = addToDate(upfrontDateInput.value, monthsInput.value);
       }
     });
     rowEl.querySelector('[data-remove-row]').addEventListener('click', () => rowEl.remove());

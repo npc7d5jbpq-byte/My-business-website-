@@ -21,11 +21,22 @@
       <div class="content">
         <div class="banner" id="page-banner" hidden></div>
 
+        <div class="section-title"><h2>Growth at a Glance</h2></div>
+        <div class="grid grid-2" id="growth-tiles" style="margin-bottom:8px;"></div>
+
         <div class="section-title"><h2>Yearly Summary</h2></div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Year</th><th class="text-right">Money In</th><th class="text-right">Money Out</th><th class="text-right">Net</th></tr></thead>
-            <tbody id="yearly-body"><tr class="empty-row"><td colspan="4">Loading…</td></tr></tbody>
+            <thead><tr><th>Year</th><th class="text-right">Money In</th><th class="text-right">Money Out</th><th class="text-right">Net</th><th class="text-right">vs Previous Year</th></tr></thead>
+            <tbody id="yearly-body"><tr class="empty-row"><td colspan="5">Loading…</td></tr></tbody>
+          </table>
+        </div>
+
+        <div class="section-title"><h2>Monthly Summary</h2></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Month</th><th class="text-right">Money In</th><th class="text-right">Money Out</th><th class="text-right">Net</th><th class="text-right">vs Previous Month</th></tr></thead>
+            <tbody id="monthly-body"><tr class="empty-row"><td colspan="5">Loading…</td></tr></tbody>
           </table>
         </div>
 
@@ -37,6 +48,7 @@
             <span class="pill-tab" data-filter="Agricultural Land">Agricultural Land</span>
             <span class="pill-tab" data-filter="Shops">Shops</span>
             <span class="pill-tab" data-filter="Commercial Land & Plots">Commercial Land &amp; Plots</span>
+            <span class="pill-tab" data-filter="Brokers Commission">Brokers Commission</span>
           </div>
         </div>
         <div class="table-wrap">

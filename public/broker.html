@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Broker — Gulberg City Office</title>
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/icon-180.png" />
+<link rel="icon" href="icons/icon-32.png" />
+<meta name="theme-color" content="#0f1a2e" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="GCO" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="main">
+      <header class="topbar" id="topbar"></header>
+      <div class="content">
+        <a class="back-link" href="brokers.html">&larr; Back to Brokers</a>
+        <div class="banner" id="page-banner" hidden></div>
+
+        <div class="detail-header">
+          <div>
+            <h1 id="broker-name">Loading…</h1>
+            <div class="meta" id="broker-phone"></div>
+          </div>
+          <div class="row-actions">
+            <button class="btn btn-ghost" id="edit-broker-btn">Edit Broker</button>
+            <button class="btn btn-danger" id="delete-broker-btn">Delete Broker</button>
+          </div>
+        </div>
+
+        <div class="grid grid-3" id="broker-tiles" style="margin-top:20px;"></div>
+
+        <div class="section-title">
+          <h2>Deals</h2>
+          <button class="btn btn-accent" id="add-deal-btn">+ Add Deal</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Deal</th>
+                <th class="text-right">Deal Value</th>
+                <th class="text-right">Commission</th>
+                <th class="text-right">Paid</th>
+                <th class="text-right">Remaining</th>
+                <th>Next Due</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="deals-body"><tr class="empty-row"><td colspan="7">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="modal-root"></div>
+  <script src="js/common.js"></script>
+  <script src="js/broker.js"></script>
+</body>
+</html>

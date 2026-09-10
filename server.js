@@ -6,6 +6,7 @@ const session = require('express-session');
 
 const { checkCredentials, requireAuth } = require('./src/auth');
 const { router: coloniesRouter } = require('./src/routes/colonies');
+const { router: brokersRouter } = require('./src/routes/brokers');
 const dashboardRouter = require('./src/routes/dashboard');
 const backupsRouter = require('./src/routes/backups');
 const accountRouter = require('./src/routes/account');
@@ -57,6 +58,7 @@ function buildApp() {
 
   // ---- Protected API ----
   app.use('/api', requireAuth, coloniesRouter);
+  app.use('/api', requireAuth, brokersRouter);
   app.use('/api', requireAuth, dashboardRouter);
   app.use('/api', requireAuth, backupsRouter);
   app.use('/api', requireAuth, accountRouter);
