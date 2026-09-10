@@ -7,17 +7,37 @@
   // a bare "Loading…" - shaped like the real cards/table that replace them.
   document.getElementById('overview-tiles').innerHTML = skeletonCards(5);
   document.getElementById('module-tiles').innerHTML = skeletonCards(4);
+  document.getElementById('payables-horizon-tiles').innerHTML = skeletonCards(7);
   document.getElementById('upcoming-body').innerHTML = skeletonRows(4, 6);
 
   try {
-    const [overview, upcoming] = await Promise.all([
+    const [overview, upcoming, payablesHorizon] = await Promise.all([
       apiRequest('/dashboard'),
       apiRequest('/dashboard/upcoming'),
+      apiRequest('/dashboard/payables-horizon'),
     ]);
     renderOverview(overview);
+    renderPayablesHorizon(payablesHorizon);
     renderUpcoming(upcoming);
   } catch (err) {
     showBanner(err.message);
+  }
+
+  // "How much money needs to be given (paid out), by when" - excluding
+  // broker commission on purpose (see the note under the section heading),
+  // so this reads purely as what the business owes sellers/contractors.
+  function renderPayablesHorizon(data) {
+    const container = document.getElementById('payables-horizon-tiles');
+    container.innerHTML = data.horizons.map((h, i) => `
+      <div class="card stat-tile accent-danger entrance" style="animation-delay:${i * 55}ms">
+        <span class="label">${escapeHtml(h.label)}</span>
+        <span class="value" data-countup="${h.amount}">Rs. 0</span>
+        <span class="sub">To be given, excl. commissions</span>
+      </div>
+    `).join('');
+    container.querySelectorAll('[data-countup]').forEach((el) => {
+      animateCountUp(el, Number(el.dataset.countup), { duration: 650 });
+    });
   }
 
   function renderOverview(data) {

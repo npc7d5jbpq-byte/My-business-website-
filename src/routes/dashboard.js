@@ -1,6 +1,6 @@
 const express = require('express');
 const db = require('../db');
-const { sumAmount, settledRows, pendingRows, isOverdue, round2 } = require('../finance');
+const { sumAmount, settledRows, pendingRows, isOverdue, round2, startOfToday } = require('../finance');
 const { computeColonyStats } = require('./colonies');
 const { computeAssetStats } = require('./assetModule');
 const { computeBrokerStats } = require('./brokers');
@@ -305,6 +305,68 @@ router.get('/dashboard/monthly', (req, res) => {
     .map((b) => ({ year: b.year, month: b.month, moneyIn: round2(b.moneyIn), moneyOut: round2(b.moneyOut), net: round2(b.moneyIn - b.moneyOut) }))
     .sort((a, b) => a.year - b.year || a.month - b.month);
   res.json(result);
+});
+
+// Every still-pending amount the business itself owes (to land/shop/
+// commercial sellers, and colony development contractors) - deliberately
+// EXCLUDING broker commission, which is tracked and paid on its own
+// separate schedule under Brokers Commission rather than mixed into this
+// "what cash do we need ready, and by when" view. Colony plot payments are
+// also excluded since those are money coming IN from buyers, not owed out.
+function upcomingPayableRows() {
+  const rows = [];
+  for (const expense of pendingRows(db.list('colonyExpenses'))) {
+    rows.push({ amount: Number(expense.amount) || 0, dueDate: expense.dueDate });
+  }
+  for (const mod of ASSET_MODULES) {
+    for (const row of pendingRows(db.list(mod.payments), 'paid')) {
+      rows.push({ amount: Number(row.amount) || 0, dueDate: row.dueDate });
+    }
+  }
+  return rows;
+}
+
+function addDays(date, days) {
+  const d = new Date(date.getTime());
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function addMonths(date, months) {
+  const d = new Date(date.getTime());
+  d.setMonth(d.getMonth() + months);
+  return d;
+}
+
+// How much money needs to be ready within each upcoming horizon - a
+// cumulative "cash runway" view (Next 3 Months already includes everything
+// due within Next 1 Month, and so on), so the client can see at a glance
+// what needs to be set aside over different planning windows. Anything
+// already overdue, or with no due date set at all, is treated as needed
+// right away and so counts toward every horizon.
+router.get('/dashboard/payables-horizon', (req, res) => {
+  const rows = upcomingPayableRows();
+  const today = startOfToday();
+  const horizonDefs = [
+    { key: 'days15', label: 'Next 15 Days', end: addDays(today, 15) },
+    { key: 'month1', label: 'Next 1 Month', end: addMonths(today, 1) },
+    { key: 'month3', label: 'Next 3 Months', end: addMonths(today, 3) },
+    { key: 'month6', label: 'Next 6 Months', end: addMonths(today, 6) },
+    { key: 'year1', label: 'Next 1 Year', end: addMonths(today, 12) },
+    { key: 'month15', label: 'Next 15 Months', end: addMonths(today, 15) },
+    { key: 'month18', label: 'Next 18 Months', end: addMonths(today, 18) },
+  ];
+  const horizons = horizonDefs.map((h) => ({
+    key: h.key,
+    label: h.label,
+    amount: round2(
+      rows
+        .filter((r) => !r.dueDate || new Date(r.dueDate) <= h.end)
+        .reduce((sum, r) => sum + r.amount, 0)
+    ),
+  }));
+  const totalPayableExcludingCommission = round2(rows.reduce((sum, r) => sum + r.amount, 0));
+  res.json({ excludesBrokerCommission: true, horizons, totalPayableExcludingCommission });
 });
 
 // Every settled (actually happened) transaction across every module, for
