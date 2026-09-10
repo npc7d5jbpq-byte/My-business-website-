@@ -51,6 +51,24 @@ machine.
   "Missed — Rescheduled", while a fresh pending installment is created for
   the new date. Nothing is deleted or silently overwritten — the missed
   promise and the new one both stay visible.
+- **Selling on installments works everywhere, not just in colonies** —
+  Agricultural Land, Shops and Commercial Land & Plots can be sold on an
+  upfront + installments schedule too, exactly like a colony plot: marking
+  a record "Sold" goes straight into the same installment-plan builder used
+  everywhere else (upfront/bayana now, the rest due later), and every
+  installment it creates has the full set of tools — Print, Mark Done,
+  Reschedule, payment method/Paid By — the same as any other payment.
+- **A sale that falls through can be Cancelled, not just Deleted** — the
+  same distinction as Brokers Commission's deal cancellation, applied to
+  colony plots and to agricultural/shop/commercial sales: **Cancel Sale**
+  voids the sale (it stops counting as owed/receivable, and its projected
+  profit drops out) while keeping the buyer, the price, and every payment
+  already made on record with a "Cancelled" badge and an optional reason -
+  **Delete** remains the separate, permanent action that erases the record
+  entirely. **Reactivate** undoes a cancellation made by mistake. Money the
+  buyer already paid before the cancellation is never lost from the books -
+  it stays counted as real cash received, only the future expectation goes
+  away.
 - **Brokers Commission** — every broker gets their own page listing every
   deal they earned a commission on separately, each with its own commission
   amount and its own payment schedule (a broker is very often paid their

@@ -63,6 +63,7 @@ function statusBadge(status) {
     owned: 'badge-info',
     pending: 'badge-warning',
     completed: 'badge-success',
+    cancelled: 'badge-danger',
   };
   const cls = map[status] || 'badge-muted';
   return `<span class="badge ${cls}">${escapeHtml(status || '')}</span>`;
@@ -223,7 +224,10 @@ function openFormModal(options) {
     errorBox.hidden = true;
     try {
       await options.onSubmit(values);
-      closeModal();
+      // Lets onSubmit chain straight into a follow-up modal (e.g. Mark Sold
+      // -> Create Installment Plan) without this auto-close racing it and
+      // wiping out whatever onSubmit just opened.
+      if (!options.keepModalOpen) closeModal();
     } catch (err) {
       errorBox.textContent = err.message || 'Something went wrong.';
       errorBox.hidden = false;

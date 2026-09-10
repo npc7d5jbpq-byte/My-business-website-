@@ -16,10 +16,15 @@ function computeAssetStats(entity, payments) {
   const salePrice = Number(entity.salePrice) || 0;
 
   const totalPayable = round2(purchasePrice - totalPaid); // still owed to the seller
+  // A cancelled sale (status: 'cancelled', set after a sale falls through -
+  // see the Cancel Sale action) is deliberately excluded here exactly like
+  // a "not sold yet" entity: its projected receivable/profit no longer
+  // count. Whatever the buyer already paid before it was cancelled stays
+  // real, though, so it's never dropped from totalReceived or cashProfit
+  // below - only the forward-looking numbers go to zero.
   const totalReceivable = entity.status === 'sold' ? round2(salePrice - totalReceived) : 0;
-
   const profit = entity.status === 'sold' ? round2(salePrice - purchasePrice) : 0;
-  const cashProfit = entity.status === 'sold' ? round2(totalReceived - totalPaid) : round2(-totalPaid);
+  const cashProfit = round2(totalReceived - totalPaid);
 
   return {
     totalPaid,
@@ -61,6 +66,8 @@ function createAssetRouter({ collection, paymentsCollection, entityLabel }) {
       sellerName: sellerName || '',
       sellerPhone: sellerPhone || '',
       status: 'owned',
+      previousStatus: '',
+      cancelReason: '',
       salePrice: 0,
       saleDate: '',
       buyerName: '',
@@ -84,7 +91,7 @@ function createAssetRouter({ collection, paymentsCollection, entityLabel }) {
     if (!entity) return res.status(404).json({ error: `${entityLabel} not found.` });
     const fields = [
       'title', 'location', 'area', 'frontFt', 'lengthFt', 'purchasePrice', 'purchaseDate', 'sellerName', 'sellerPhone',
-      'status', 'salePrice', 'saleDate', 'buyerName', 'buyerPhone', 'notes',
+      'status', 'previousStatus', 'cancelReason', 'salePrice', 'saleDate', 'buyerName', 'buyerPhone', 'notes',
     ];
     const numeric = new Set(['purchasePrice', 'salePrice', 'frontFt', 'lengthFt']);
     const patch = {};

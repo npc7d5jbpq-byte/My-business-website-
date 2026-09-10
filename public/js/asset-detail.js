@@ -39,7 +39,9 @@
     setPageTitle(r.title);
     document.getElementById('entity-name').textContent = r.title;
     document.getElementById('entity-meta').innerHTML = `${escapeHtml(r.location || 'No location set')} ${statusBadge(r.status)}`;
-    document.getElementById('mark-sold-btn').hidden = r.status === 'sold';
+    document.getElementById('mark-sold-btn').hidden = r.status !== 'owned';
+    document.getElementById('cancel-sale-btn').hidden = r.status !== 'sold';
+    document.getElementById('reactivate-btn').hidden = r.status !== 'cancelled';
 
     const tiles = [
       { label: 'Purchase Price', value: r.purchasePrice, sub: r.purchaseDate ? `Purchased ${formatDate(r.purchaseDate)}` : '', accent: '' },
@@ -48,6 +50,8 @@
     ];
     if (r.status === 'sold') {
       tiles.push({ label: 'Profit', value: s.profit, sub: 'Sale price − purchase price', accent: s.profit >= 0 ? 'accent-success' : 'accent-danger' });
+    } else if (r.status === 'cancelled') {
+      tiles.push({ label: 'Sale Status', value: 'Cancelled', sub: r.cancelReason || '', accent: 'accent-danger' });
     } else {
       tiles.push({ label: 'Sale Status', value: 'Not sold yet', sub: '', accent: '' });
     }
@@ -58,18 +62,25 @@
     }).join('');
     document.querySelectorAll('#entity-tiles [data-countup]').forEach((el) => animateCountUp(el, Number(el.dataset.countup), { duration: 650 }));
 
-    const saleCard = r.status === 'sold' ? `
+    let saleCard;
+    if (r.status === 'sold' || r.status === 'cancelled') {
+      const cancelled = r.status === 'cancelled';
+      saleCard = `
       <div class="card entrance" style="animation-delay:320ms;">
-        <div style="font-weight:700; margin-bottom:10px;">${escapeHtml(config.buyerNoun)}</div>
+        <div style="font-weight:700; margin-bottom:10px;">${escapeHtml(config.buyerNoun)}${cancelled ? ' <span class="badge badge-danger">Sale Cancelled</span>' : ''}</div>
         <div style="font-size:13px; line-height:1.9;">
           <div>${escapeHtml(r.buyerName || 'Not set')}</div>
           ${r.buyerPhone ? `<div class="text-muted">${escapeHtml(r.buyerPhone)}</div>` : ''}
           <div class="text-muted">Sale price: ${formatCurrency(r.salePrice)}</div>
           <div class="text-muted">Received so far: ${formatCurrency(s.totalReceived)}</div>
-          <div class="text-muted">Still receivable: ${formatCurrency(s.totalReceivable)}</div>
+          ${cancelled
+            ? (r.cancelReason ? `<div class="text-muted">Cancelled: ${escapeHtml(r.cancelReason)}</div>` : '')
+            : `<div class="text-muted">Still receivable: ${formatCurrency(s.totalReceivable)}</div>`}
           ${r.saleDate ? `<div class="text-muted">Sale date: ${formatDate(r.saleDate)}</div>` : ''}
         </div>
-      </div>` : `
+      </div>`;
+    } else {
+      saleCard = `
       <div class="card entrance" style="animation-delay:320ms;">
         <div style="font-weight:700; margin-bottom:10px;">Seller</div>
         <div style="font-size:13px; line-height:1.9;">
@@ -77,6 +88,7 @@
           ${r.sellerPhone ? `<div class="text-muted">${escapeHtml(r.sellerPhone)}</div>` : ''}
         </div>
       </div>`;
+    }
 
     document.getElementById('entity-info-cards').innerHTML = `
       <div class="card entrance" style="animation-delay:260ms;">
@@ -238,9 +250,14 @@
     });
   });
 
-  document.getElementById('add-plan-btn').addEventListener('click', () => {
+  // Extracted so it can also be opened automatically right after Mark Sold
+  // - a sale is very often not paid in full up front, so this is the
+  // natural next step rather than a separate button the client has to go
+  // find afterward.
+  function openInstallmentPlanModal(defaultDirection) {
     openCustomModal('Create Installment Plan', `<form id="plan-form">${installmentPlanFormHtml({ includeDirection: true })}</form>`, (root) => {
       initInstallmentPlanRows(root);
+      if (defaultDirection) root.querySelector('[name=planDirection]').value = defaultDirection;
       root.querySelector('[data-plan-cancel]').addEventListener('click', closeModal);
       root.querySelector('#plan-form').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -286,7 +303,9 @@
         }
       });
     });
-  });
+  }
+
+  document.getElementById('add-plan-btn').addEventListener('click', openInstallmentPlanModal);
 
   // ---- Header actions ----
 
@@ -329,16 +348,48 @@
         { name: 'buyerName', label: `${config.buyerNoun} name`, required: true },
         { name: 'buyerPhone', label: `${config.buyerNoun} phone` },
       ],
+      keepModalOpen: true,
       onSubmit: async (values) => {
         values.status = 'sold';
         await apiRequest(`${config.apiBase}/${id}`, { method: 'PUT', body: values });
+        await load();
+        // The sale is very often not paid in full up front - jump straight
+        // into setting up how it'll be paid instead of leaving the client
+        // to go find "+ Create Installment Plan" themselves.
+        openInstallmentPlanModal('received');
+      },
+    });
+  });
+
+  // Cancel keeps the record, its buyer info and its full payment history on
+  // record (with a "Cancelled" badge, and no longer counted as a live sale)
+  // instead of erasing that the sale ever happened - Delete below is the
+  // separate, permanent action for that. The underlying owned land/shop/
+  // commercial record itself (what was paid to the original seller) is
+  // untouched either way.
+  document.getElementById('cancel-sale-btn').addEventListener('click', () => {
+    openFormModal({
+      title: 'Cancel Sale',
+      submitLabel: 'Cancel Sale',
+      fields: [
+        { name: 'cancelReason', label: 'Reason (optional)', type: 'textarea', placeholder: 'e.g. buyer backed out' },
+      ],
+      onSubmit: async (values) => {
+        await apiRequest(`${config.apiBase}/${id}`, { method: 'PUT', body: { status: 'cancelled', previousStatus: state.entity.status, cancelReason: values.cancelReason } });
         load();
       },
     });
   });
 
+  document.getElementById('reactivate-btn').addEventListener('click', withButtonBusy(document.getElementById('reactivate-btn'), async () => {
+    try {
+      await apiRequest(`${config.apiBase}/${id}`, { method: 'PUT', body: { status: state.entity.previousStatus || 'sold', previousStatus: '', cancelReason: '' } });
+      load();
+    } catch (err) { showBanner(err.message); }
+  }));
+
   document.getElementById('delete-entity-btn').addEventListener('click', withButtonBusy(document.getElementById('delete-entity-btn'), async () => {
-    if (!confirm(`Delete this ${config.entityNoun.toLowerCase()} record and its payment history? This cannot be undone.`)) return;
+    if (!confirm(`Permanently delete this ${config.entityNoun.toLowerCase()} record and its payment history? This cannot be undone - if you just want to void the sale but keep it on record, use "Cancel Sale" instead.`)) return;
     try {
       await apiRequest(`${config.apiBase}/${id}`, { method: 'DELETE' });
       window.location.href = config.navHref;
@@ -347,5 +398,11 @@
     }
   }));
 
-  load();
+  await load();
+  // Arrived here right after Mark Sold on the list page - open the
+  // installment plan builder immediately instead of making the client find
+  // the button themselves.
+  if (params.get('openPlan') === '1' && state.entity && state.entity.status === 'sold') {
+    openInstallmentPlanModal('received');
+  }
 })();

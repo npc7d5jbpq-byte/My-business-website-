@@ -86,21 +86,25 @@
       const dueCell = due
         ? `${formatCurrency(due.amount)}<div style="font-size:11px; ${due.overdue ? 'color:var(--danger); font-weight:700;' : 'color:var(--text-muted);'}">${formatDate(due.dueDate)}${due.overdue ? ' · OVERDUE' : ''}</div>`
         : '<span class="text-muted">—</span>';
+      const cancelled = p.status === 'cancelled';
       return `
-      <tr>
+      <tr style="${cancelled ? 'opacity:0.6;' : ''}">
         <td style="font-weight:700;">${escapeHtml(p.plotNumber)}</td>
         <td>${escapeHtml(p.size || '—')}</td>
         <td style="text-transform:capitalize;">${escapeHtml(CATEGORY_LABELS[p.category] || p.category || '—')}</td>
-        <td>${statusBadge(p.status)}</td>
+        <td>${statusBadge(p.status)}${cancelled && p.cancelReason ? `<div class="text-muted" style="font-size:11px;">${escapeHtml(p.cancelReason)}</div>` : ''}</td>
         <td>${escapeHtml(p.buyerName || '—')}${p.buyerPhone ? `<div class="text-muted" style="font-size:11px;">${escapeHtml(p.buyerPhone)}</div>` : ''}</td>
         <td class="text-right num">${formatCurrency(p.price)}</td>
         <td class="text-right num" style="color:var(--success);">${formatCurrency(p.received)}</td>
-        <td class="text-right num" style="color:${p.remaining > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${formatCurrency(p.remaining)}</td>
+        <td class="text-right num" style="color:${!cancelled && p.remaining > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${cancelled ? '<span class="text-muted">—</span>' : formatCurrency(p.remaining)}</td>
         <td class="num">${dueCell}</td>
         <td>
           <div class="row-actions">
             <a class="btn btn-ghost btn-sm" href="plot.html?colonyId=${encodeURIComponent(colonyId)}&plotId=${p.id}">Open</a>
             <button class="btn btn-ghost btn-sm" data-edit-plot="${p.id}">Edit</button>
+            ${cancelled
+              ? `<button class="btn btn-ghost btn-sm" data-reactivate-plot="${p.id}">Reactivate</button>`
+              : (p.status === 'sold' || p.status === 'reserved' ? `<button class="btn btn-ghost btn-sm" data-cancel-sale="${p.id}">Cancel Sale</button>` : '')}
             <button class="btn btn-danger btn-sm" data-delete-plot="${p.id}">Delete</button>
           </div>
         </td>
@@ -162,6 +166,8 @@
 
   document.getElementById('plots-body').addEventListener('click', (e) => {
     const editBtn = e.target.closest('[data-edit-plot]');
+    const cancelBtn = e.target.closest('[data-cancel-sale]');
+    const reactivateBtn = e.target.closest('[data-reactivate-plot]');
     const delBtn = e.target.closest('[data-delete-plot]');
     if (editBtn) {
       const plot = state.colony.plots.find((p) => p.id === editBtn.dataset.editPlot);
@@ -175,9 +181,36 @@
         },
       });
     }
+    // Cancel keeps the plot, its buyer info and its full payment history on
+    // record (with a "Cancelled" badge, and no longer counted as a live
+    // sale) instead of erasing that the sale ever happened - Delete below
+    // is the separate, permanent action for that.
+    if (cancelBtn) {
+      const plot = state.colony.plots.find((p) => p.id === cancelBtn.dataset.cancelSale);
+      openFormModal({
+        title: `Cancel Sale — Plot ${plot.plotNumber}`,
+        submitLabel: 'Cancel Sale',
+        fields: [
+          { name: 'cancelReason', label: 'Reason (optional)', type: 'textarea', placeholder: 'e.g. buyer backed out' },
+        ],
+        onSubmit: async (values) => {
+          await apiRequest(`/plots/${plot.id}`, { method: 'PUT', body: { status: 'cancelled', previousStatus: plot.status, cancelReason: values.cancelReason } });
+          load();
+        },
+      });
+    }
+    if (reactivateBtn) {
+      withButtonBusy(reactivateBtn, async () => {
+        const plot = state.colony.plots.find((p) => p.id === reactivateBtn.dataset.reactivatePlot);
+        try {
+          await apiRequest(`/plots/${plot.id}`, { method: 'PUT', body: { status: plot.previousStatus || 'sold', previousStatus: '', cancelReason: '' } });
+          load();
+        } catch (err) { showBanner(err.message); }
+      })();
+    }
     if (delBtn) {
       withButtonBusy(delBtn, async () => {
-        if (!confirm('Delete this plot and all of its payment history?')) return;
+        if (!confirm('Permanently delete this plot and all of its payment history? This cannot be undone - if you just want to void the sale but keep it on record, use "Cancel Sale" instead.')) return;
         try {
           await apiRequest(`/plots/${delBtn.dataset.deletePlot}`, { method: 'DELETE' });
           load();

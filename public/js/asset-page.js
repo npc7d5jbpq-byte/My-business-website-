@@ -33,11 +33,14 @@ function initAssetPage(config) {
       }
       body.innerHTML = state.rows.map((r) => {
         const s = r.stats;
+        const cancelled = r.status === 'cancelled';
         const saleCell = r.status === 'sold'
           ? `Price: ${formatCurrency(r.salePrice)}<br>Received: <span style="color:var(--success)">${formatCurrency(s.totalReceived)}</span><br>Receivable: <span style="color:${s.totalReceivable > 0 ? 'var(--danger)' : 'var(--text-muted)'}">${formatCurrency(s.totalReceivable)}</span>`
-          : '<span class="text-muted">Not sold yet</span>';
+          : (cancelled
+            ? `<span class="text-muted">Sale cancelled${r.cancelReason ? ' — ' + escapeHtml(r.cancelReason) : ''}</span><br>Received: <span style="color:var(--success)">${formatCurrency(s.totalReceived)}</span>`
+            : '<span class="text-muted">Not sold yet</span>');
         return `
-        <tr>
+        <tr style="${cancelled ? 'opacity:0.6;' : ''}">
           <td>
             <div style="font-weight:700;">${escapeHtml(r.title)}</div>
             <div class="text-muted" style="font-size:11.5px;">${escapeHtml(r.location || '')}${r.area ? ` · ${escapeHtml(r.area)}` : ''}</div>
@@ -54,7 +57,9 @@ function initAssetPage(config) {
             <div class="row-actions">
               <a class="btn btn-ghost btn-sm" href="asset-detail.html?type=${encodeURIComponent(config.type)}&id=${r.id}">Open</a>
               <button class="btn btn-ghost btn-sm" data-edit="${r.id}">Edit</button>
-              ${r.status !== 'sold' ? `<button class="btn btn-ghost btn-sm" data-mark-sold="${r.id}">Mark Sold</button>` : ''}
+              ${r.status === 'owned' ? `<button class="btn btn-ghost btn-sm" data-mark-sold="${r.id}">Mark Sold</button>` : ''}
+              ${r.status === 'sold' ? `<button class="btn btn-ghost btn-sm" data-cancel-sale="${r.id}">Cancel Sale</button>` : ''}
+              ${cancelled ? `<button class="btn btn-ghost btn-sm" data-reactivate="${r.id}">Reactivate</button>` : ''}
               <button class="btn btn-danger btn-sm" data-delete="${r.id}">Delete</button>
             </div>
           </td>
@@ -94,6 +99,8 @@ function initAssetPage(config) {
     document.getElementById('rows-body').addEventListener('click', (e) => {
       const editBtn = e.target.closest('[data-edit]');
       const soldBtn = e.target.closest('[data-mark-sold]');
+      const cancelBtn = e.target.closest('[data-cancel-sale]');
+      const reactivateBtn = e.target.closest('[data-reactivate]');
       const delBtn = e.target.closest('[data-delete]');
 
       if (editBtn) {
@@ -123,14 +130,47 @@ function initAssetPage(config) {
           onSubmit: async (values) => {
             values.status = 'sold';
             await apiRequest(`${config.apiBase}/${row.id}`, { method: 'PUT', body: values });
+            // The sale is very often not paid in full up front - jump straight
+            // to that record's own page with its installment-plan builder
+            // open, instead of leaving the client to go find it themselves.
+            window.location.href = `asset-detail.html?type=${encodeURIComponent(config.type)}&id=${row.id}&openPlan=1`;
+          },
+        });
+      }
+
+      // Cancel keeps the record, its buyer info and its full payment history
+      // on record (with a "Cancelled" badge, and no longer counted as a live
+      // sale) instead of erasing that the sale ever happened - Delete below
+      // is the separate, permanent action for that. The underlying owned
+      // land/shop/commercial record itself is untouched either way.
+      if (cancelBtn) {
+        const row = state.rows.find((r) => r.id === cancelBtn.dataset.cancelSale);
+        openFormModal({
+          title: 'Cancel Sale',
+          submitLabel: 'Cancel Sale',
+          fields: [
+            { name: 'cancelReason', label: 'Reason (optional)', type: 'textarea', placeholder: 'e.g. buyer backed out' },
+          ],
+          onSubmit: async (values) => {
+            await apiRequest(`${config.apiBase}/${row.id}`, { method: 'PUT', body: { status: 'cancelled', previousStatus: row.status, cancelReason: values.cancelReason } });
             load();
           },
         });
       }
 
+      if (reactivateBtn) {
+        withButtonBusy(reactivateBtn, async () => {
+          const row = state.rows.find((r) => r.id === reactivateBtn.dataset.reactivate);
+          try {
+            await apiRequest(`${config.apiBase}/${row.id}`, { method: 'PUT', body: { status: row.previousStatus || 'sold', previousStatus: '', cancelReason: '' } });
+            load();
+          } catch (err) { showBanner(err.message); }
+        })();
+      }
+
       if (delBtn) {
         withButtonBusy(delBtn, async () => {
-          if (!confirm(`Delete this ${config.entityNoun.toLowerCase()} record and its payment history?`)) return;
+          if (!confirm(`Permanently delete this ${config.entityNoun.toLowerCase()} record and its payment history? This cannot be undone - if you just want to void the sale but keep it on record, use "Cancel Sale" instead.`)) return;
           try {
             await apiRequest(`${config.apiBase}/${delBtn.dataset.delete}`, { method: 'DELETE' });
             load();

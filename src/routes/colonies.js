@@ -13,14 +13,28 @@ function computeColonyStats(colony) {
   const percentSold = totalPlots ? round2((sold / totalPlots) * 100) : 0;
   const percentBooked = totalPlots ? round2(((sold + reserved) / totalPlots) * 100) : 0;
 
-  // Only plots that actually have a buyer contribute to sale value / dues.
-  const bookedPlots = plots.filter((p) => p.status !== 'available');
+  // Only plots that actually have a live buyer commitment contribute to
+  // sale value / dues - a cancelled sale (status: 'cancelled') is excluded
+  // here the same way a cancelled broker deal is excluded from commission
+  // totals, even though any money already received on it (below) stays
+  // counted as real cash that came in.
+  const bookedPlots = plots.filter((p) => p.status === 'sold' || p.status === 'reserved');
   const totalSaleValue = round2(bookedPlots.reduce((sum, p) => sum + (Number(p.price) || 0), 0));
 
   const plotIds = new Set(plots.map((p) => p.id));
   const payments = db.list('plotPayments', (pay) => plotIds.has(pay.parentId));
   const totalReceived = round2(sumAmount(settledRows(payments)));
-  const totalReceivable = round2(totalSaleValue - totalReceived);
+  // Computed per-plot (not as one global totalSaleValue - totalReceived
+  // subtraction) so a cancelled plot that already received a partial
+  // payment can't drag every *other* plot's receivable down - its own
+  // contribution here is simply 0, not negative.
+  const receivedByPlot = new Map();
+  for (const row of settledRows(payments)) {
+    receivedByPlot.set(row.parentId, (receivedByPlot.get(row.parentId) || 0) + (Number(row.amount) || 0));
+  }
+  const totalReceivable = round2(
+    bookedPlots.reduce((sum, p) => sum + Math.max(0, (Number(p.price) || 0) - (receivedByPlot.get(p.id) || 0)), 0)
+  );
 
   const expenses = db.list('colonyExpenses', (e) => e.colonyId === colony.id);
   const totalExpensesPaid = round2(sumAmount(settledRows(expenses)));
@@ -145,6 +159,8 @@ router.post('/colonies/:id/plots', (req, res) => {
     lengthFt: Number(lengthFt) || 0,
     price: Number(price) || 0,
     status: status || 'available',
+    previousStatus: '',
+    cancelReason: '',
     buyerName: buyerName || '',
     buyerPhone: buyerPhone || '',
     buyerCnic: buyerCnic || '',
@@ -157,7 +173,7 @@ router.post('/colonies/:id/plots', (req, res) => {
 router.put('/plots/:id', (req, res) => {
   const plot = db.get('plots', req.params.id);
   if (!plot) return res.status(404).json({ error: 'Plot not found.' });
-  const fields = ['plotNumber', 'size', 'category', 'frontFt', 'lengthFt', 'price', 'status', 'buyerName', 'buyerPhone', 'buyerCnic', 'saleDate', 'notes'];
+  const fields = ['plotNumber', 'size', 'category', 'frontFt', 'lengthFt', 'price', 'status', 'previousStatus', 'cancelReason', 'buyerName', 'buyerPhone', 'buyerCnic', 'saleDate', 'notes'];
   const numeric = new Set(['price', 'frontFt', 'lengthFt']);
   const patch = {};
   for (const f of fields) {

@@ -156,8 +156,11 @@ router.get('/dashboard/upcoming', (req, res) => {
 
   for (const colony of db.list('colonies')) {
     const plots = db.list('plots', (p) => p.colonyId === colony.id);
-    const plotIds = new Set(plots.map((p) => p.id));
-    const plotById = new Map(plots.map((p) => [p.id, p]));
+    // A cancelled sale's still-pending installments are void - no longer
+    // something actually expected from a buyer - so they're left out here.
+    const activePlots = plots.filter((p) => p.status !== 'cancelled');
+    const plotIds = new Set(activePlots.map((p) => p.id));
+    const plotById = new Map(activePlots.map((p) => [p.id, p]));
     for (const row of pendingRows(db.list('plotPayments', (p) => plotIds.has(p.parentId)))) {
       const plot = plotById.get(row.parentId);
       items.push({
@@ -203,6 +206,11 @@ router.get('/dashboard/upcoming', (req, res) => {
     for (const row of pendingRows(db.list(mod.payments))) {
       const entity = entityById.get(row.parentId);
       if (!entity) continue;
+      // A pending 'received' installment on a cancelled sale is void (the
+      // buyer relationship fell through) - a pending 'paid' installment to
+      // the original seller is unaffected either way, since that side of
+      // the deal has nothing to do with whether the resale went through.
+      if (row.direction === 'received' && entity.status === 'cancelled') continue;
       items.push({
         module: mod.label,
         context: entity.title,

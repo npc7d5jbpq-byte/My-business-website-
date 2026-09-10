@@ -49,6 +49,10 @@
     document.getElementById('plot-name').textContent = `Plot ${p.plotNumber}`;
     document.getElementById('plot-meta').textContent = `${state.colony.name}${p.size ? ' · ' + p.size : ''}`;
 
+    const cancelled = p.status === 'cancelled';
+    document.getElementById('cancel-sale-btn').hidden = cancelled || !(p.status === 'sold' || p.status === 'reserved');
+    document.getElementById('reactivate-plot-btn').hidden = !cancelled;
+
     const due = nextDueOf(p.payments);
     const tiles = [
       { label: 'Sale Price', value: p.price, sub: '', accent: '' },
@@ -73,6 +77,7 @@
           ${p.buyerPhone ? `<div class="text-muted">${escapeHtml(p.buyerPhone)}</div>` : ''}
           ${p.buyerCnic ? `<div class="text-muted">CNIC: ${escapeHtml(p.buyerCnic)}</div>` : ''}
           <div class="text-muted">Status: ${statusBadge(p.status)}</div>
+          ${p.status === 'cancelled' && p.cancelReason ? `<div class="text-muted">Cancelled: ${escapeHtml(p.cancelReason)}</div>` : ''}
           ${p.saleDate ? `<div class="text-muted">Sale/booking date: ${formatDate(p.saleDate)}</div>` : ''}
         </div>
       </div>
@@ -326,8 +331,29 @@
     });
   });
 
+  document.getElementById('cancel-sale-btn').addEventListener('click', () => {
+    openFormModal({
+      title: 'Cancel Sale',
+      submitLabel: 'Cancel Sale',
+      fields: [
+        { name: 'cancelReason', label: 'Reason (optional)', type: 'textarea', placeholder: 'e.g. buyer backed out' },
+      ],
+      onSubmit: async (values) => {
+        await apiRequest(`/plots/${plotId}`, { method: 'PUT', body: { status: 'cancelled', previousStatus: state.plot.status, cancelReason: values.cancelReason } });
+        load();
+      },
+    });
+  });
+
+  document.getElementById('reactivate-plot-btn').addEventListener('click', withButtonBusy(document.getElementById('reactivate-plot-btn'), async () => {
+    try {
+      await apiRequest(`/plots/${plotId}`, { method: 'PUT', body: { status: state.plot.previousStatus || 'sold', previousStatus: '', cancelReason: '' } });
+      load();
+    } catch (err) { showBanner(err.message); }
+  }));
+
   document.getElementById('delete-plot-btn').addEventListener('click', withButtonBusy(document.getElementById('delete-plot-btn'), async () => {
-    if (!confirm('Delete this plot and all of its payment history? This cannot be undone.')) return;
+    if (!confirm('Permanently delete this plot and all of its payment history? This cannot be undone - if you just want to void the sale but keep it on record, use "Cancel Sale" instead.')) return;
     try {
       await apiRequest(`/plots/${plotId}`, { method: 'DELETE' });
       window.location.href = `colony.html?id=${encodeURIComponent(colonyId)}`;
