@@ -36,6 +36,9 @@ const COLLECTIONS = [
   'brokerCommissionPayments',
   'brokerAdvances',
   'attachments',
+  'people',
+  'peopleDeals',
+  'peoplePayments',
 ];
 
 function emptyStore() {

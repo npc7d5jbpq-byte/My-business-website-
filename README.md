@@ -158,12 +158,22 @@ machine.
   colony plot they bought, agricultural land they sold to the office, a
   broker profile, all in one place, each with a link straight to that
   record.
-- **People directory** — a dedicated **People** page (in the sidebar)
-  listing everyone the office has ever dealt with as a buyer, seller, or
-  broker, one row per person: their phone, which role(s) they've had, how
-  many records they're on, how much they still owe the office, and how
-  much the office still owes them. Search narrows it by name or phone;
-  opening a row goes straight into that person's unified view above.
+- **People** — a full module (in the sidebar, alongside Colonies/Land/
+  Brokers) for a deal with someone that doesn't fit any of those — a loan,
+  a service, or any other regular business dealing. **Add Person** to
+  create a profile (name, phone, CNIC, notes), then their own dedicated
+  page works exactly like a broker's: **Add Deal** for each thing owed
+  one way or the other — tagged **"They owe us" (receivable)** or **"We
+  owe them" (payable)** instead of a commission — with its own payment
+  schedule (installment plans, Mark Paid/Received, Reschedule, payment
+  method tracking, printable receipts and a full statement), and **Cancel
+  Deal** (voids it without erasing it, keeping whatever was already
+  settled on record) as the alternative to **Delete** (permanent). People
+  deals count toward the Dashboard, Reports & Ledger, and Cash Position
+  the same as every other module. The existing unified person view (see
+  above) automatically folds in a matching Person's deals too, so someone
+  who's, say, both a colony buyer and has a manual People deal shows up
+  completely in either place.
 - **Document attachments** — attach scanned paperwork (a CNIC, a sale
   agreement, a registry copy — any file type, up to 20MB) directly to a
   colony, a plot, an agricultural/shop/commercial record, a broker, or a
@@ -383,6 +393,7 @@ src/finance.js           Shared money/date math (paid vs. pending, overdue, sums
 src/routes/colonies.js   Colonies, plots, milestones, development expenses
 src/routes/assetModule.js  Shared buy/sell/payments logic for the 3 modules below
 src/routes/brokers.js    Brokers, their deals, and each deal's commission payments
+src/routes/people.js     People module: a person, their deals (receivable/payable), and payments
 src/routes/dashboard.js  Cross-module totals, upcoming dues, yearly/monthly summary, ledger, cash position
 src/routes/directory.js  Global search and the unified person-view lookup, across every module
 src/routes/attachments.js  Document attachments: upload/list/download/delete, cascade-delete on parent delete
@@ -393,7 +404,8 @@ public/plot.html         A single colony plot's own dedicated page (dimensions, 
 public/asset-detail.html A single agricultural/shop/commercial record's own dedicated page
 public/statement.html    Full payment-history statement printout (A4) for a plot/record/deal
 public/person.html       Unified person view — every deal one person has, across every module
-public/people.html       People directory — every buyer/seller/broker, browsable and searchable
+public/people.html       People module list page — Add Person, browse everyone added
+public/people-detail.html  A single Person's own dedicated page (deals, payments, documents)
 public/backups.html      Backups & Restore page
 public/account.html      Account Settings (change username/password) page
 .github/workflows/       CI workflow that builds the Windows/macOS/Linux installers

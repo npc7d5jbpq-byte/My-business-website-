@@ -33,7 +33,8 @@
     setPageTitle(data.name);
     document.getElementById('person-name').textContent = data.name;
 
-    const totalRecords = data.plots.length + data.assets.length + data.brokers.length;
+    const personDealsCount = data.person ? data.person.deals.length : 0;
+    const totalRecords = data.plots.length + data.assets.length + data.brokers.length + personDealsCount;
 
     // "Owed to the office" = this person is a buyer somewhere and hasn't
     // fully paid yet. "Owed to them" = the office still owes them, either
@@ -54,9 +55,13 @@
     for (const b of data.brokers) {
       owedToThem += Math.max(0, Number(b.stats.totalPending) || 0);
     }
+    if (data.person) {
+      owedToOffice += Math.max(0, Number(data.person.stats.totalReceivable) || 0);
+      owedToThem += Math.max(0, Number(data.person.stats.totalPayable) || 0);
+    }
 
     const tiles = [
-      tile('Total Records', totalRecords, `${data.plots.length} plot${data.plots.length === 1 ? '' : 's'} · ${data.assets.length} other deal${data.assets.length === 1 ? '' : 's'} · ${data.brokers.length} broker profile${data.brokers.length === 1 ? '' : 's'}`, '', 0),
+      tile('Total Records', totalRecords, `${data.plots.length} plot${data.plots.length === 1 ? '' : 's'} · ${data.assets.length} other deal${data.assets.length === 1 ? '' : 's'} · ${data.brokers.length} broker profile${data.brokers.length === 1 ? '' : 's'}${data.person ? ` · ${personDealsCount} general deal${personDealsCount === 1 ? '' : 's'}` : ''}`, '', 0),
       tile('Still Owed to the Office', owedToOffice, 'From plots/deals bought from us', owedToOffice > 0 ? 'accent-danger' : '', 1),
       tile('Still Owed to Them', owedToThem, 'From sales to us, or broker commission', owedToThem > 0 ? 'accent-danger' : '', 2),
     ];
@@ -142,6 +147,39 @@
                   <td><a class="btn btn-ghost btn-sm" href="broker.html?id=${encodeURIComponent(b.id)}">Open</a></td>
                 </tr>
               `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `);
+    }
+
+    if (data.person) {
+      const DIRECTION_LABEL = { receivable: 'They owe us', payable: 'We owe them' };
+      parts.push(`
+        <div class="section-title">
+          <h2>General Deals</h2>
+          <a class="btn btn-ghost btn-sm" href="people-detail.html?id=${encodeURIComponent(data.person.id)}">Manage in People &rarr;</a>
+        </div>
+        <p class="text-muted" style="font-size:12.5px; margin:-10px 0 14px;">Deals recorded directly against this person (not tied to a colony, land, shop, or commercial record) — loans, services, or any other regular business dealing.</p>
+        <div class="table-wrap" style="margin-bottom:24px;">
+          <table>
+            <thead><tr><th>Deal</th><th>Type</th><th class="text-right">Amount</th><th class="text-right">Settled</th><th class="text-right">Remaining</th></tr></thead>
+            <tbody>
+              ${data.person.deals.length ? data.person.deals.map((d) => {
+                const cancelled = d.status === 'cancelled';
+                return `
+                <tr style="${cancelled ? 'opacity:0.6;' : ''}">
+                  <td style="font-weight:700;">
+                    <span style="${cancelled ? 'text-decoration:line-through;' : ''}">${escapeHtml(d.description)}</span>
+                    ${cancelled ? '<span class="badge badge-danger" style="margin-left:6px;">Cancelled</span>' : ''}
+                  </td>
+                  <td><span class="badge ${d.direction === 'payable' ? 'badge-danger' : 'badge-success'}">${DIRECTION_LABEL[d.direction] || d.direction}</span></td>
+                  <td class="text-right num">${formatCurrency(d.stats.amount)}</td>
+                  <td class="text-right num" style="color:var(--success);">${formatCurrency(d.stats.totalPaid)}</td>
+                  <td class="text-right num" style="color:${!cancelled && d.stats.remaining > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${cancelled ? '<span class="text-muted">—</span>' : formatCurrency(d.stats.remaining)}</td>
+                </tr>
+              `;
+              }).join('') : '<tr class="empty-row"><td colspan="5">No general deals recorded yet.</td></tr>'}
             </tbody>
           </table>
         </div>

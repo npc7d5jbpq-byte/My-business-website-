@@ -47,6 +47,28 @@
       };
     }
 
+    if (apiBase === '/people') {
+      const personId = params.get('personId');
+      const dealId = params.get('dealId');
+      const person = await apiRequest(`/people/${personId}`);
+      const deal = person.deals.find((d) => d.id === dealId);
+      if (!deal) throw new Error('That deal could not be found.');
+      const isPayable = deal.direction === 'payable';
+      return {
+        heading: deal.description,
+        description: '',
+        sections: [{
+          sectionLabel: 'Deal', priceLabel: 'Deal Amount',
+          partyLabel: 'Person', partyName: person.name || '—', partySub: person.phone || '',
+          direction: isPayable ? 'paid' : 'received',
+          totalPrice: Number(deal.stats.amount) || 0,
+          totalSettled: Number(deal.stats.totalPaid) || 0,
+          remaining: Number(deal.stats.remaining) || 0,
+          payments: deal.payments || [],
+        }],
+      };
+    }
+
     if (apiBase === '/colonies') {
       const colonyId = params.get('colonyId');
       const plotId = params.get('plotId');

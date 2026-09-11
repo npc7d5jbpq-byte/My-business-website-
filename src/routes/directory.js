@@ -2,12 +2,13 @@
 // living inside one of them:
 //
 //  - GET /search?q=...      - one box, searches colonies/plots/agricultural
-//                              land/shops/commercial/brokers at once by
-//                              name, phone, CNIC, or plot number.
+//                              land/shops/commercial/brokers/people at once
+//                              by name, phone, CNIC, or plot number.
 //  - GET /person?name=...   - every deal a single person has ever had with
 //                              the office, wherever it lives (a buyer on a
-//                              plot AND a seller of agricultural land, say),
-//                              gathered onto one page.
+//                              plot, a seller of agricultural land, or a
+//                              manually-added Person from src/routes/
+//                              people.js), gathered onto one page.
 //
 // Both are read-only and deliberately simple: a case-insensitive substring
 // match for search, and a case-insensitive exact match (after trimming) for
@@ -19,6 +20,7 @@ const db = require('../db');
 const { sumAmount, settledRows, round2 } = require('../finance');
 const { computeAssetStats } = require('./assetModule');
 const { computeBrokerStats } = require('./brokers');
+const { computePersonStats, computeDealStats } = require('./people');
 
 const router = express.Router();
 
@@ -90,86 +92,20 @@ router.get('/search', (req, res) => {
     }
   }
 
+  for (const person of db.list('people')) {
+    if (anyMatch(q, person.name, person.phone, person.cnic)) {
+      results.push({
+        type: 'person', module: 'Person',
+        label: person.name,
+        sublabel: person.phone || '',
+        url: `people-detail.html?id=${person.id}`,
+      });
+    }
+  }
+
   // Colonies first (broadest), then everything else in the order found -
   // capped well above what anyone would actually scroll through.
   res.json({ results: results.slice(0, 60) });
-});
-
-// ---- People directory ----
-//
-// One row per distinct person (matched the same case-insensitive way as
-// the person view above) across every buyer/seller/broker in the system,
-// with a quick-glance summary - so the office can browse everyone they've
-// ever dealt with instead of only reaching a person by clicking their name
-// somewhere else first.
-
-router.get('/people', (req, res) => {
-  const people = new Map(); // norm(name) -> summary row being built
-
-  function ensure(rawName) {
-    const key = norm(rawName);
-    if (!key) return null;
-    if (!people.has(key)) {
-      people.set(key, { name: String(rawName).trim(), phone: '', roles: new Set(), recordCount: 0, owedToOffice: 0, owedToThem: 0 });
-    }
-    return people.get(key);
-  }
-
-  for (const plot of db.list('plots')) {
-    const p = ensure(plot.buyerName);
-    if (!p) continue;
-    if (!p.phone && plot.buyerPhone) p.phone = plot.buyerPhone;
-    p.roles.add('Buyer');
-    p.recordCount += 1;
-    if (plot.status !== 'cancelled') {
-      const payments = db.list('plotPayments', (pay) => pay.parentId === plot.id);
-      const received = round2(sumAmount(settledRows(payments)));
-      p.owedToOffice += Math.max(0, round2((Number(plot.price) || 0) - received));
-    }
-  }
-
-  for (const { collection, paymentsCollection } of ASSET_TYPES) {
-    for (const entity of db.list(collection)) {
-      const payments = db.list(paymentsCollection, (pay) => pay.parentId === entity.id);
-      const stats = computeAssetStats(entity, payments);
-      const buyer = ensure(entity.buyerName);
-      if (buyer) {
-        if (!buyer.phone && entity.buyerPhone) buyer.phone = entity.buyerPhone;
-        buyer.roles.add('Buyer');
-        buyer.recordCount += 1;
-        if (entity.status !== 'cancelled') buyer.owedToOffice += Math.max(0, stats.totalReceivable);
-      }
-      const seller = ensure(entity.sellerName);
-      if (seller) {
-        if (!seller.phone && entity.sellerPhone) seller.phone = entity.sellerPhone;
-        seller.roles.add('Seller');
-        seller.recordCount += 1;
-        seller.owedToThem += Math.max(0, stats.totalPayable);
-      }
-    }
-  }
-
-  for (const broker of db.list('brokers')) {
-    const p = ensure(broker.name);
-    if (!p) continue;
-    if (!p.phone && broker.phone) p.phone = broker.phone;
-    p.roles.add('Broker');
-    p.recordCount += 1;
-    p.owedToThem += Math.max(0, computeBrokerStats(broker).totalPending);
-  }
-
-  const rows = Array.from(people.values())
-    .map((p) => ({
-      name: p.name,
-      phone: p.phone,
-      roles: Array.from(p.roles).sort(),
-      recordCount: p.recordCount,
-      owedToOffice: round2(p.owedToOffice),
-      owedToThem: round2(p.owedToThem),
-    }))
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-  res.json(rows);
 });
 
 // ---- Unified person view ----
@@ -214,11 +150,32 @@ router.get('/person', (req, res) => {
     .list('brokers', (b) => norm(b.name) === name)
     .map((b) => Object.assign({}, b, { stats: computeBrokerStats(b) }));
 
-  if (!plots.length && !assets.length && !brokers.length) {
+  // A matching manually-added Person (src/routes/people.js) - folded in
+  // here too, so someone who's e.g. both a colony buyer AND has a manual
+  // deal recorded there shows up completely in this one view, with a link
+  // through to their own dedicated page for managing those deals.
+  const personEntity = db.list('people', (p) => norm(p.name) === name)[0] || null;
+  let personDeals = [];
+  if (personEntity) {
+    personDeals = db
+      .list('peopleDeals', (d) => d.personId === personEntity.id)
+      .map((d) => {
+        const payments = db.list('peoplePayments', (p) => p.parentId === d.id);
+        return Object.assign({}, d, { payments, stats: computeDealStats(d, payments) });
+      });
+  }
+
+  if (!plots.length && !assets.length && !brokers.length && !personEntity) {
     return res.status(404).json({ error: 'No records found for this person. Names are matched exactly (case-insensitive) - check the spelling matches what was entered elsewhere.' });
   }
 
-  res.json({ name: rawName, plots, assets, brokers });
+  res.json({
+    name: rawName,
+    plots,
+    assets,
+    brokers,
+    person: personEntity ? Object.assign({}, personEntity, { stats: computePersonStats(personEntity), deals: personDeals }) : null,
+  });
 });
 
 module.exports = router;

@@ -20,27 +20,29 @@
       <header class="topbar" id="topbar"></header>
       <div class="content">
         <div class="banner" id="page-banner" hidden></div>
-
-        <div class="section-title"><h2>People</h2></div>
-        <p class="text-muted" style="font-size:12.5px; margin:-6px 0 14px;">Every buyer, seller, and broker your office has ever dealt with, in one place — open anyone's name for their full history across every module (a colony plot they bought, land they sold, a broker profile, and so on).</p>
-
-        <div class="field" style="max-width:320px; margin-bottom:16px;">
-          <input type="text" id="people-search" placeholder="Search by name or phone…" />
+        <div class="section-title">
+          <h2>All People</h2>
+          <button class="btn btn-accent" id="add-person-btn">+ Add Person</button>
         </div>
-
+        <p class="text-muted" style="font-size:12.5px; margin:-10px 0 14px;">
+          For a deal with someone that isn't a colony plot, land, a shop, commercial property, or a
+          broker's commission — a loan, a service, or any other regular business dealing. Each person
+          gets their own page with their own deals and payment history, the same way a broker does.
+        </p>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Name</th>
-                <th>Phone</th>
-                <th>Role(s)</th>
-                <th class="text-right">Records</th>
+                <th>Person</th>
+                <th>Deals</th>
                 <th class="text-right">Owed to Office</th>
                 <th class="text-right">Owed to Them</th>
+                <th></th>
               </tr>
             </thead>
-            <tbody id="people-body"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
+            <tbody id="people-body">
+              <tr class="empty-row"><td colspan="5">Loading…</td></tr>
+            </tbody>
           </table>
         </div>
       </div>

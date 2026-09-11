@@ -112,6 +112,16 @@
           ['Still to be given', formatCurrency(data.brokerSummary.totalPending)],
         ],
       },
+      {
+        title: 'People',
+        href: 'people.html',
+        lines: [
+          [`${data.peopleSummary.count} people`, ''],
+          ['Received', formatCurrency(data.peopleSummary.totalReceived)],
+          ['Still owed to office', formatCurrency(data.peopleSummary.totalReceivable)],
+          ['Still owed to them', formatCurrency(data.peopleSummary.totalPayable)],
+        ],
+      },
     ];
 
     document.getElementById('module-tiles').innerHTML = modules.map((m, i) => `

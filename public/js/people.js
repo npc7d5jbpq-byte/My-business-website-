@@ -3,43 +3,71 @@
   if (!session) return;
   setPageTitle('People');
 
-  let people = [];
-
-  document.getElementById('people-body').innerHTML = skeletonRows(5, 6);
+  document.getElementById('people-body').innerHTML = skeletonRows(3, 5);
 
   async function load() {
     try {
-      people = await apiRequest('/people');
-      render();
+      const people = await apiRequest('/people');
+      render(people);
     } catch (err) {
       showBanner(err.message);
     }
   }
 
-  const ROLE_BADGE = { Buyer: 'badge-success', Seller: 'badge-info', Broker: 'badge-warning' };
-
-  function render() {
-    const q = (document.getElementById('people-search').value || '').toLowerCase().trim();
-    const rows = q ? people.filter((p) => p.name.toLowerCase().includes(q) || (p.phone || '').toLowerCase().includes(q)) : people;
+  function render(people) {
     const body = document.getElementById('people-body');
-    if (!rows.length) {
-      body.innerHTML = `<tr class="empty-row"><td colspan="6">${people.length ? 'No people match your search.' : 'No people recorded yet — they show up here as soon as they appear as a buyer, seller, or broker anywhere in the system.'}</td></tr>`;
+    if (!people.length) {
+      body.innerHTML = '<tr class="empty-row"><td colspan="5">No people added yet. Click "Add Person" to create the first one.</td></tr>';
       return;
     }
-    body.innerHTML = rows.map((p) => `
+    body.innerHTML = people.map((p) => `
       <tr>
-        <td style="font-weight:700;">${personLink(p.name)}</td>
-        <td>${escapeHtml(p.phone || '—')}</td>
-        <td>${p.roles.map((r) => `<span class="badge ${ROLE_BADGE[r] || 'badge-muted'}" style="margin-right:4px;">${escapeHtml(r)}</span>`).join('')}</td>
-        <td class="text-right num">${p.recordCount}</td>
-        <td class="text-right num" style="color:${p.owedToOffice > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${formatCurrency(p.owedToOffice)}</td>
-        <td class="text-right num" style="color:${p.owedToThem > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${formatCurrency(p.owedToThem)}</td>
+        <td>
+          ${personLink(p.name)}
+          <div class="text-muted" style="font-size:11.5px;">${escapeHtml(p.phone || '')}</div>
+        </td>
+        <td>${p.stats.dealsCount}</td>
+        <td class="text-right num" style="color:${p.stats.totalReceivable > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${formatCurrency(p.stats.totalReceivable)}</td>
+        <td class="text-right num" style="color:${p.stats.totalPayable > 0 ? 'var(--danger)' : 'var(--text-muted)'};">${formatCurrency(p.stats.totalPayable)}</td>
+        <td>
+          <div class="row-actions">
+            <a class="btn btn-ghost btn-sm" href="people-detail.html?id=${p.id}">Open</a>
+            <button class="btn btn-danger btn-sm" data-delete="${p.id}">Delete</button>
+          </div>
+        </td>
       </tr>
     `).join('');
-    staggerRows(body, { stepMs: 25, maxDelayMs: 220 });
+    staggerRows(body, { stepMs: 40 });
+
+    body.querySelectorAll('[data-delete]').forEach((btn) => {
+      btn.addEventListener('click', withButtonBusy(btn, async () => {
+        if (!confirm('Delete this person and all of their deals and payment history? This cannot be undone.')) return;
+        try {
+          await apiRequest(`/people/${btn.dataset.delete}`, { method: 'DELETE' });
+          load();
+        } catch (err) {
+          showBanner(err.message);
+        }
+      }));
+    });
   }
 
-  document.getElementById('people-search').addEventListener('input', render);
+  document.getElementById('add-person-btn').addEventListener('click', () => {
+    openFormModal({
+      title: 'Add Person',
+      submitLabel: 'Add Person',
+      fields: [
+        { name: 'name', label: 'Name', required: true },
+        { name: 'phone', label: 'Phone' },
+        { name: 'cnic', label: 'CNIC' },
+        { name: 'notes', label: 'Notes', type: 'textarea' },
+      ],
+      onSubmit: async (values) => {
+        await apiRequest('/people', { method: 'POST', body: values });
+        load();
+      },
+    });
+  });
 
   load();
 })();

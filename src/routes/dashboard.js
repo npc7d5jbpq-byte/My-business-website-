@@ -4,6 +4,7 @@ const { sumAmount, settledRows, pendingRows, isOverdue, round2, startOfToday } =
 const { computeColonyStats } = require('./colonies');
 const { computeAssetStats } = require('./assetModule');
 const { computeBrokerStats } = require('./brokers');
+const { computePersonStats } = require('./people');
 
 const router = express.Router();
 
@@ -115,30 +116,62 @@ function brokerModuleTotals() {
   };
 }
 
+// People deals have no purchase-price/profit concept (they're not a piece
+// of property being bought and resold) - just money owed one way or the
+// other - so this rolls up totalReceived/totalPaid/totalReceivable/
+// totalPayable the same as every other module's totals, with no profit
+// figure to contribute.
+function peopleModuleTotals() {
+  const people = db.list('people');
+  let totalReceived = 0;
+  let totalPaid = 0;
+  let totalReceivable = 0;
+  let totalPayable = 0;
+  for (const person of people) {
+    const stats = computePersonStats(person);
+    totalReceived += stats.totalReceived;
+    totalPaid += stats.totalPaid;
+    totalReceivable += stats.totalReceivable;
+    totalPayable += stats.totalPayable;
+  }
+  return {
+    label: 'People',
+    count: people.length,
+    totalReceived: round2(totalReceived),
+    totalPaid: round2(totalPaid),
+    totalReceivable: round2(totalReceivable),
+    totalPayable: round2(totalPayable),
+  };
+}
+
 router.get('/dashboard', (req, res) => {
   const colonySummary = colonyModuleTotals();
   const assetSummaries = ASSET_MODULES.map(assetModuleTotals);
   const brokerSummary = brokerModuleTotals();
+  const peopleSummary = peopleModuleTotals();
 
   const totalMoneyIn = round2(
-    colonySummary.totalReceived + assetSummaries.reduce((s, m) => s + m.totalReceived, 0)
+    colonySummary.totalReceived + assetSummaries.reduce((s, m) => s + m.totalReceived, 0) + peopleSummary.totalReceived
   );
   const totalMoneyOut = round2(
     colonySummary.totalExpensesPaid +
       colonySummary.acquisitionCost +
       assetSummaries.reduce((s, m) => s + m.totalPaid, 0) +
-      brokerSummary.cashOut
+      brokerSummary.cashOut +
+      peopleSummary.totalPaid
   );
   const totalReceivable = round2(
-    colonySummary.totalReceivable + assetSummaries.reduce((s, m) => s + m.totalReceivable, 0)
+    colonySummary.totalReceivable + assetSummaries.reduce((s, m) => s + m.totalReceivable, 0) + peopleSummary.totalReceivable
   );
   const totalPayable = round2(
     colonySummary.totalExpensesPending +
       assetSummaries.reduce((s, m) => s + m.totalPayable, 0) +
-      brokerSummary.totalPending
+      brokerSummary.totalPending +
+      peopleSummary.totalPayable
   );
   const netProfit = round2(
-    colonySummary.cashProfit + assetSummaries.reduce((s, m) => s + m.profit, 0) - brokerSummary.totalCommission
+    colonySummary.cashProfit + assetSummaries.reduce((s, m) => s + m.profit, 0) - brokerSummary.totalCommission +
+      peopleSummary.totalReceived - peopleSummary.totalPaid
   );
 
   res.json({
@@ -146,6 +179,7 @@ router.get('/dashboard', (req, res) => {
     colonySummary,
     assetSummaries,
     brokerSummary,
+    peopleSummary,
   });
 });
 
@@ -245,6 +279,27 @@ router.get('/dashboard/upcoming', (req, res) => {
     }
   }
 
+  for (const person of db.list('people')) {
+    // Same convention as everywhere else: a cancelled deal's still-pending
+    // installments are void, not actually expected/owed any more.
+    const deals = db.list('peopleDeals', (d) => d.personId === person.id && d.status !== 'cancelled');
+    const dealById = new Map(deals.map((d) => [d.id, d]));
+    const dealIds = new Set(deals.map((d) => d.id));
+    for (const row of pendingRows(db.list('peoplePayments', (p) => dealIds.has(p.parentId)))) {
+      const deal = dealById.get(row.parentId);
+      items.push({
+        module: 'People',
+        context: `${person.name} - ${deal ? deal.description : ''}`,
+        person: person.name,
+        amount: row.amount,
+        dueDate: row.dueDate,
+        direction: deal && deal.direction === 'payable' ? 'paid' : 'received',
+        overdue: isOverdue(row),
+        notes: row.notes,
+      });
+    }
+  }
+
   items.sort((a, b) => new Date(a.dueDate || 0) - new Date(b.dueDate || 0));
   res.json(items);
 });
@@ -276,6 +331,11 @@ function collectMoneyFlows() {
   }
   for (const row of db.list('brokerAdvances')) {
     flows.push({ date: row.date || row.createdAt, amount: Number(row.amount) || 0, direction: 'out' });
+  }
+  const peopleDealById = new Map(db.list('peopleDeals').map((d) => [d.id, d]));
+  for (const row of settledRows(db.list('peoplePayments'))) {
+    const deal = peopleDealById.get(row.parentId);
+    flows.push({ date: row.paidDate, amount: Number(row.amount) || 0, direction: deal && deal.direction === 'payable' ? 'out' : 'in' });
   }
   return flows;
 }
@@ -354,6 +414,10 @@ function upcomingPayableRows() {
       rows.push({ amount: Number(row.amount) || 0, dueDate: row.dueDate });
     }
   }
+  const payableDealIds = new Set(db.list('peopleDeals', (d) => d.direction === 'payable' && d.status !== 'cancelled').map((d) => d.id));
+  for (const row of pendingRows(db.list('peoplePayments', (p) => payableDealIds.has(p.parentId)))) {
+    rows.push({ amount: Number(row.amount) || 0, dueDate: row.dueDate });
+  }
   return rows;
 }
 
@@ -388,6 +452,10 @@ function upcomingReceivableRows() {
     for (const row of pendingRows(db.list(mod.payments, (p) => entityIds.has(p.parentId)), 'received')) {
       rows.push({ amount: Number(row.amount) || 0, dueDate: row.dueDate });
     }
+  }
+  const receivableDealIds = new Set(db.list('peopleDeals', (d) => d.direction === 'receivable' && d.status !== 'cancelled').map((d) => d.id));
+  for (const row of pendingRows(db.list('peoplePayments', (p) => receivableDealIds.has(p.parentId)))) {
+    rows.push({ amount: Number(row.amount) || 0, dueDate: row.dueDate });
   }
   return rows;
 }
@@ -538,6 +606,23 @@ router.get('/dashboard/ledger', (req, res) => {
     }
   }
 
+  for (const person of db.list('people')) {
+    const deals = db.list('peopleDeals', (d) => d.personId === person.id);
+    const dealById = new Map(deals.map((d) => [d.id, d]));
+    const dealIds = new Set(deals.map((d) => d.id));
+    for (const row of settledRows(db.list('peoplePayments', (p) => dealIds.has(p.parentId)))) {
+      const deal = dealById.get(row.parentId);
+      entries.push({
+        date: row.paidDate,
+        module: 'People',
+        context: `${person.name} - ${deal ? deal.description : ''}`,
+        direction: deal && deal.direction === 'payable' ? 'out' : 'in',
+        amount: row.amount,
+        notes: row.notes,
+      });
+    }
+  }
+
   entries.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
   res.json(entries);
 });
@@ -589,6 +674,12 @@ router.get('/dashboard/cash-position', (req, res) => {
   }
   for (const row of db.list('brokerAdvances')) {
     bucketFor(row.paidThrough, row.bankName).out += Number(row.amount) || 0;
+  }
+  const peopleDealDirectionById = new Map(db.list('peopleDeals').map((d) => [d.id, d.direction]));
+  for (const row of settledRows(db.list('peoplePayments'))) {
+    const b = bucketFor(row.paidThrough, row.bankName);
+    if (peopleDealDirectionById.get(row.parentId) === 'payable') b.out += Number(row.amount) || 0;
+    else b.in += Number(row.amount) || 0;
   }
 
   const order = { cash: 0, unspecified: 2 };
