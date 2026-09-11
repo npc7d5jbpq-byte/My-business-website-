@@ -74,12 +74,34 @@
           <h2>Backup history</h2>
           <button class="btn btn-accent" id="backup-now-btn">Backup Now</button>
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap" style="margin-bottom:24px;">
           <table>
             <thead>
               <tr><th>Date &amp; time</th><th>Type</th><th class="text-right">Size</th><th></th></tr>
             </thead>
             <tbody id="backups-body"><tr class="empty-row"><td colspan="4">Loading…</td></tr></tbody>
+          </table>
+        </div>
+
+        <div class="section-title">
+          <h2>Excel export (plain, readable copies)</h2>
+          <button class="btn btn-accent" id="export-now-btn">Export Now</button>
+        </div>
+        <p class="text-muted" style="font-size:12.5px; margin:-10px 0 14px; line-height:1.6;">
+          The backups above are for the app itself to restore from — opening one directly just shows raw
+          technical text. This is the readable version: a normal Excel spreadsheet (colonies, plots, land,
+          brokers, people, and a full transaction ledger, each on its own sheet with plain column headings)
+          that opens straight into Excel, Google Sheets, or LibreOffice. A fresh one is generated
+          <strong>automatically every time a backup is taken</strong> — on startup, every 15 minutes if
+          anything changed, and on close — so there's always an up-to-date copy without anyone needing to
+          remember. <strong>Export Now</strong> takes one on demand too.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Date &amp; time</th><th>Type</th><th class="text-right">Size</th><th></th></tr>
+            </thead>
+            <tbody id="exports-body"><tr class="empty-row"><td colspan="4">Loading…</td></tr></tbody>
           </table>
         </div>
       </div>

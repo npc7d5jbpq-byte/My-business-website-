@@ -56,6 +56,10 @@ function buildMenu() {
           label: 'Open Automatic Backups Folder',
           click: () => shell.openPath(backup.BACKUPS_DIR),
         },
+        {
+          label: 'Open Automatic Excel Exports Folder',
+          click: () => shell.openPath(backup.EXPORTS_DIR),
+        },
         { type: 'separator' },
         {
           label: 'Set Secondary Backup Location (USB / Network)…',
@@ -196,10 +200,16 @@ app.whenReady().then(() => {
   });
 });
 
-app.on('window-all-closed', () => {
-  // Capture a final snapshot of anything edited since the last scheduled
-  // backup before the app (and its embedded server) actually shuts down.
-  backup.backupOnShutdown();
-  if (serverHandle) serverHandle.server.close();
-  app.quit();
+app.on('window-all-closed', async () => {
+  // Capture a final snapshot (+ Excel export) of anything edited since the
+  // last scheduled backup before the app (and its embedded server)
+  // actually shuts down. Awaited because the Excel export writes
+  // asynchronously - quitting before it resolves could cut the file off
+  // mid-write.
+  try {
+    await backup.backupOnShutdown();
+  } finally {
+    if (serverHandle) serverHandle.server.close();
+    app.quit();
+  }
 });

@@ -131,11 +131,17 @@ if (require.main === module) {
       process.exit(1);
     });
 
-  // Take a final backup on a normal Ctrl+C / service stop, so edits made
-  // since the last scheduled backup are still captured.
-  const shutdown = () => {
-    backup.backupOnShutdown();
-    process.exit(0);
+  // Take a final backup (+ Excel export) on a normal Ctrl+C / service stop,
+  // so edits made since the last scheduled backup are still captured.
+  // backupOnShutdown() writes the Excel file asynchronously, so it must be
+  // awaited before actually exiting - otherwise process.exit() could cut
+  // that write off mid-file.
+  const shutdown = async () => {
+    try {
+      await backup.backupOnShutdown();
+    } finally {
+      process.exit(0);
+    }
   };
   process.on('SIGINT', shutdown);
   process.on('SIGTERM', shutdown);

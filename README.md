@@ -117,7 +117,8 @@ machine.
   a regular A4/letter printer alike — no special driver or printer-
   integration code needed beyond installing the printer in Windows itself,
   the way you would for any other program.
-- **Automatic, scheduled, multi-copy backups** — see **Data Persistence &
+- **Automatic, scheduled, multi-copy backups — plus a plain, readable
+  Excel export generated on the same schedule** — see **Data Persistence &
   Backups** below for exactly where, how often, how many, and how to
   restore.
 - **Cash Position — by payment method** — on **Reports & Ledger**, a table
@@ -224,6 +225,38 @@ and covered by the tests in this repo's history:
 | **How many copies are retained?** | A rolling ("grandfather-father-son") policy so the folder never grows without bound: **every** backup from the **last 48 hours**, **one per calendar day** for the **last 30 days**, and **one per calendar month** after that, kept **indefinitely**. Each snapshot is a small JSON file (typically KB, not MB), so even years of monthly backups stay negligible in size. |
 | **How does restoring work?** | Open the **Backups & Restore** page in the app, pick any backup from the list (each shows its date/time, whether it was automatic or manual, and its size), click **Restore this backup**, and confirm. The app automatically snapshots the *current* data first (labeled "Safety copy (before a restore)") before overwriting anything, so a restore is itself always reversible by restoring again. No restart is needed — the app reloads with the restored data immediately. |
 
+**Readable Excel export — for actually opening and reading your data.** A
+JSON backup is for the *app* to restore from; opening one directly (in
+Notepad, say) just shows raw technical text, not something you'd hand
+someone or browse yourself. `src/export.js` builds a genuinely readable
+alternative: a normal `.xlsx` workbook with one sheet per module (Summary,
+Colonies, Colony Plots, Colony Expenses, Agricultural Land, Shops,
+Commercial Land & Plots, Brokers, Broker Deals, People, People Deals, and
+a Full Ledger of every settled transaction), plain English column headers,
+and real currency-formatted numbers — opens straight into Excel, Google
+Sheets, or LibreOffice.
+
+- **Fully automatic, same as the JSON backups** — a fresh export is
+  generated on the exact same triggers (startup, every 15 minutes if
+  anything changed, on close, before a restore) via `src/backup.js`'s
+  `runBackupCycle()`, so a current, readable copy always exists without
+  anyone needing to remember. An **Export Now** button (next to Backup
+  Now, on the Backups & Restore page) also takes one on demand.
+- **Tracked the same way** — a history table right below the backup
+  history, showing every export's date/time, type (automatic/manual), and
+  size, each with a **Download** link. Desktop app: **File → Open
+  Automatic Excel Exports Folder** opens the raw files directly.
+- Kept to the same 48-hour/30-day/monthly retention policy as JSON
+  backups, and mirrored to the secondary (USB/network) location too if
+  one is configured, in its own `gulberg-city-office-exports` subfolder.
+- Built from the same live data as everything else (via the existing
+  `computeColonyStats`/`computeAssetStats`/`computeBrokerStats`/
+  `computePersonStats` functions), so its numbers always match what the
+  app itself shows — never a separately-maintained copy that could drift.
+- Does **not** include document attachments (scanned CNICs, agreements) -
+  those are files, not spreadsheet rows; see the Document Attachments
+  section above for how those are stored.
+
 **Secondary (off-machine) backup location.** Everything above still lives on
 the one computer running the app — if its hard drive fails, both the data
 and its backups are gone together. To close that gap, point the app at a
@@ -233,9 +266,10 @@ a native folder picker) and every backup is automatically mirrored there too
 from then on, with no manual copying required:
 
 - Every backup cycle (startup, the 15-minute auto-check, shutdown, manual,
-  pre-restore) also copies any backup file not yet on that drive over to it,
-  into a `gulberg-city-office-backups` subfolder so it doesn't clutter a
-  drive used for other things too.
+  pre-restore) also copies any backup file — and any Excel export — not yet
+  on that drive over to it, into `gulberg-city-office-backups` and
+  `gulberg-city-office-exports` subfolders respectively, so neither
+  clutters a drive used for other things too.
 - If the drive isn't plugged in at the time, syncing is **skipped silently**
   (never blocks or fails the local backup) and retried automatically on the
   next cycle, or immediately via **Sync Now**.
@@ -388,6 +422,7 @@ server.js                Express app (shared by the desktop app and plain `npm s
 src/db.js                Simple JSON file data store (no external database needed)
 src/settings.js          Shared small-settings file (secondary backup location, login credentials)
 src/backup.js            Automatic backup scheduler, retention policy, and restore
+src/export.js            Builds the readable Excel export (one workbook, one sheet per module)
 src/auth.js              Login check, in-app credential changes, route-protection middleware
 src/finance.js           Shared money/date math (paid vs. pending, overdue, sums)
 src/routes/colonies.js   Colonies, plots, milestones, development expenses
@@ -397,7 +432,7 @@ src/routes/people.js     People module: a person, their deals (receivable/payabl
 src/routes/dashboard.js  Cross-module totals, upcoming dues, yearly/monthly summary, ledger, cash position
 src/routes/directory.js  Global search and the unified person-view lookup, across every module
 src/routes/attachments.js  Document attachments: upload/list/download/delete, cascade-delete on parent delete
-src/routes/backups.js    Backup list/create/restore API
+src/routes/backups.js    Backup list/create/restore + Excel export list/create/download API
 src/routes/account.js    Change username/password API
 public/                  Frontend (plain HTML/CSS/JS, no build step required)
 public/plot.html         A single colony plot's own dedicated page (dimensions, payments)

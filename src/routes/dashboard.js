@@ -519,8 +519,10 @@ router.get('/dashboard/receivables-horizon', (req, res) => {
 });
 
 // Every settled (actually happened) transaction across every module, for
-// the full ledger / year-end review.
-router.get('/dashboard/ledger', (req, res) => {
+// the full ledger / year-end review. Exported (not just used by the route
+// below) so the Excel export (src/export.js) can build its own "Full
+// Ledger" sheet from the exact same data instead of duplicating this logic.
+function buildLedgerEntries() {
   const entries = [];
 
   for (const colony of db.list('colonies')) {
@@ -624,7 +626,11 @@ router.get('/dashboard/ledger', (req, res) => {
   }
 
   entries.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-  res.json(entries);
+  return entries;
+}
+
+router.get('/dashboard/ledger', (req, res) => {
+  res.json(buildLedgerEntries());
 });
 
 // How much money the office should actually be holding right now, broken
@@ -691,3 +697,4 @@ router.get('/dashboard/cash-position', (req, res) => {
 });
 
 module.exports = router;
+module.exports.buildLedgerEntries = buildLedgerEntries;

@@ -26,6 +26,7 @@
   }
 
   document.getElementById('backups-body').innerHTML = skeletonRows(4, 4);
+  document.getElementById('exports-body').innerHTML = skeletonRows(4, 4);
 
   async function load() {
     try {
@@ -34,6 +35,12 @@
       document.getElementById('backups-dir-path').textContent = data.backupsDirectory;
       render(data.backups);
       renderSecondary(data.secondary);
+    } catch (err) {
+      showBanner(err.message);
+    }
+    try {
+      const data = await apiRequest('/exports');
+      renderExports(data.exports);
     } catch (err) {
       showBanner(err.message);
     }
@@ -74,6 +81,30 @@
           <td>
             <div class="row-actions">
               <button class="btn btn-ghost btn-sm" data-restore="${escapeHtml(b.filename)}">Restore this backup</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
+    staggerRows(body, { stepMs: 30 });
+  }
+
+  function renderExports(exports) {
+    const body = document.getElementById('exports-body');
+    if (!exports.length) {
+      body.innerHTML = '<tr class="empty-row"><td colspan="4">No exports yet — one will be taken automatically shortly, or click "Export Now".</td></tr>';
+      return;
+    }
+    body.innerHTML = exports.map((e) => {
+      const meta = LABELS[e.label] || { text: e.label, cls: 'badge-muted' };
+      return `
+        <tr>
+          <td style="font-weight:600;">${formatDateTime(e.createdAt)}</td>
+          <td><span class="badge ${meta.cls}">${escapeHtml(meta.text)}</span></td>
+          <td class="text-right num">${formatSize(e.sizeBytes)}</td>
+          <td>
+            <div class="row-actions">
+              <a class="btn btn-ghost btn-sm" href="/api/exports/${encodeURIComponent(e.filename)}/download">Download</a>
             </div>
           </td>
         </tr>
@@ -125,7 +156,18 @@
   backupNowBtn.addEventListener('click', withButtonBusy(backupNowBtn, async () => {
     try {
       await apiRequest('/backups', { method: 'POST' });
-      showBanner('Backup created.', 'success');
+      showBanner('Backup created (a fresh Excel export was taken too).', 'success');
+      load();
+    } catch (err) {
+      showBanner(err.message);
+    }
+  }));
+
+  const exportNowBtn = document.getElementById('export-now-btn');
+  exportNowBtn.addEventListener('click', withButtonBusy(exportNowBtn, async () => {
+    try {
+      await apiRequest('/exports', { method: 'POST' });
+      showBanner('Excel export created.', 'success');
       load();
     } catch (err) {
       showBanner(err.message);
