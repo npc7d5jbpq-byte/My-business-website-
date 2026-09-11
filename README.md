@@ -158,6 +158,12 @@ machine.
   colony plot they bought, agricultural land they sold to the office, a
   broker profile, all in one place, each with a link straight to that
   record.
+- **People directory** — a dedicated **People** page (in the sidebar)
+  listing everyone the office has ever dealt with as a buyer, seller, or
+  broker, one row per person: their phone, which role(s) they've had, how
+  many records they're on, how much they still owe the office, and how
+  much the office still owes them. Search narrows it by name or phone;
+  opening a row goes straight into that person's unified view above.
 - **Document attachments** — attach scanned paperwork (a CNIC, a sale
   agreement, a registry copy — any file type, up to 20MB) directly to a
   colony, a plot, an agricultural/shop/commercial record, a broker, or a
@@ -387,6 +393,7 @@ public/plot.html         A single colony plot's own dedicated page (dimensions, 
 public/asset-detail.html A single agricultural/shop/commercial record's own dedicated page
 public/statement.html    Full payment-history statement printout (A4) for a plot/record/deal
 public/person.html       Unified person view — every deal one person has, across every module
+public/people.html       People directory — every buyer/seller/broker, browsable and searchable
 public/backups.html      Backups & Restore page
 public/account.html      Account Settings (change username/password) page
 .github/workflows/       CI workflow that builds the Windows/macOS/Linux installers

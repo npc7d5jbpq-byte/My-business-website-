@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>People — Gulberg City Office</title>
+<link rel="stylesheet" href="css/style.css" />
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/icon-180.png" />
+<link rel="icon" href="icons/icon-32.png" />
+<meta name="theme-color" content="#0f1a2e" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="GCO" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" id="sidebar"></aside>
+    <div class="main">
+      <header class="topbar" id="topbar"></header>
+      <div class="content">
+        <div class="banner" id="page-banner" hidden></div>
+
+        <div class="section-title"><h2>People</h2></div>
+        <p class="text-muted" style="font-size:12.5px; margin:-6px 0 14px;">Every buyer, seller, and broker your office has ever dealt with, in one place — open anyone's name for their full history across every module (a colony plot they bought, land they sold, a broker profile, and so on).</p>
+
+        <div class="field" style="max-width:320px; margin-bottom:16px;">
+          <input type="text" id="people-search" placeholder="Search by name or phone…" />
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Role(s)</th>
+                <th class="text-right">Records</th>
+                <th class="text-right">Owed to Office</th>
+                <th class="text-right">Owed to Them</th>
+              </tr>
+            </thead>
+            <tbody id="people-body"><tr class="empty-row"><td colspan="6">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="modal-root"></div>
+  <script src="js/common.js"></script>
+  <script src="js/people.js"></script>
+</body>
+</html>

@@ -95,6 +95,83 @@ router.get('/search', (req, res) => {
   res.json({ results: results.slice(0, 60) });
 });
 
+// ---- People directory ----
+//
+// One row per distinct person (matched the same case-insensitive way as
+// the person view above) across every buyer/seller/broker in the system,
+// with a quick-glance summary - so the office can browse everyone they've
+// ever dealt with instead of only reaching a person by clicking their name
+// somewhere else first.
+
+router.get('/people', (req, res) => {
+  const people = new Map(); // norm(name) -> summary row being built
+
+  function ensure(rawName) {
+    const key = norm(rawName);
+    if (!key) return null;
+    if (!people.has(key)) {
+      people.set(key, { name: String(rawName).trim(), phone: '', roles: new Set(), recordCount: 0, owedToOffice: 0, owedToThem: 0 });
+    }
+    return people.get(key);
+  }
+
+  for (const plot of db.list('plots')) {
+    const p = ensure(plot.buyerName);
+    if (!p) continue;
+    if (!p.phone && plot.buyerPhone) p.phone = plot.buyerPhone;
+    p.roles.add('Buyer');
+    p.recordCount += 1;
+    if (plot.status !== 'cancelled') {
+      const payments = db.list('plotPayments', (pay) => pay.parentId === plot.id);
+      const received = round2(sumAmount(settledRows(payments)));
+      p.owedToOffice += Math.max(0, round2((Number(plot.price) || 0) - received));
+    }
+  }
+
+  for (const { collection, paymentsCollection } of ASSET_TYPES) {
+    for (const entity of db.list(collection)) {
+      const payments = db.list(paymentsCollection, (pay) => pay.parentId === entity.id);
+      const stats = computeAssetStats(entity, payments);
+      const buyer = ensure(entity.buyerName);
+      if (buyer) {
+        if (!buyer.phone && entity.buyerPhone) buyer.phone = entity.buyerPhone;
+        buyer.roles.add('Buyer');
+        buyer.recordCount += 1;
+        if (entity.status !== 'cancelled') buyer.owedToOffice += Math.max(0, stats.totalReceivable);
+      }
+      const seller = ensure(entity.sellerName);
+      if (seller) {
+        if (!seller.phone && entity.sellerPhone) seller.phone = entity.sellerPhone;
+        seller.roles.add('Seller');
+        seller.recordCount += 1;
+        seller.owedToThem += Math.max(0, stats.totalPayable);
+      }
+    }
+  }
+
+  for (const broker of db.list('brokers')) {
+    const p = ensure(broker.name);
+    if (!p) continue;
+    if (!p.phone && broker.phone) p.phone = broker.phone;
+    p.roles.add('Broker');
+    p.recordCount += 1;
+    p.owedToThem += Math.max(0, computeBrokerStats(broker).totalPending);
+  }
+
+  const rows = Array.from(people.values())
+    .map((p) => ({
+      name: p.name,
+      phone: p.phone,
+      roles: Array.from(p.roles).sort(),
+      recordCount: p.recordCount,
+      owedToOffice: round2(p.owedToOffice),
+      owedToThem: round2(p.owedToThem),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  res.json(rows);
+});
+
 // ---- Unified person view ----
 
 router.get('/person', (req, res) => {
